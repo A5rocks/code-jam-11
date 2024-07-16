@@ -33,3 +33,16 @@ jobs:
 
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
+
+      - name: Install development dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Check dependency pins
+        run: |
+          uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt
+          uv pip compile --universal --python-version 3.12 requirements-dev.in -o requirements-dev.txt
+
+          # check nothing changed
+          if git status --porcelain | grep "\.txt"; then
+            exit 1
+          fi

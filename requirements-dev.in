@@ -1,0 +1,4 @@
+ruff
+pre-commit
+uv
+-r requirements.txt
