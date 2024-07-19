@@ -26,4 +26,4 @@ repos:
       - id: pip-compile
         name: pip-compile requirements-dev.in
         args: [--universal, --python-version, "3.12", requirements-dev.in, -o, requirements-dev.txt]
-        files: ^requirements-dev\.(in|txt)$
+        files: ^requirements(-dev)?\.(in|txt)$

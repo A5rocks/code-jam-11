@@ -18,5 +18,7 @@ multidict==6.0.5
     # via
     #   aiohttp
     #   yarl
+python-dotenv==1.0.1
+    # via -r requirements.in
 yarl==1.9.4
     # via aiohttp
