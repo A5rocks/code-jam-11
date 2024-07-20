@@ -1,5 +1,15 @@
 # Quizzical Quasars
 
+## running this
+
+### With Docker
+
+`docker run -it ghcr.io/a5rocks/code-jam-11:stable -e TOKEN=...`
+
+### Locally
+
+In a virtual environment, run `python -m pip install -r requirements.txt`. Then, move `.env.example` to `.env` and fill it out. Finally, run `python app`.
+
 ## development tool rundown
 
 (TODO: this should be written to be less verbose)
