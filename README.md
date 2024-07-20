@@ -62,6 +62,8 @@ It is *installed* by running `pre-commit install` and can be run manually by cal
 - `trailing-whitespace`: Removes whitespaces at the end of each line.
 - `ruff`: Runs the Ruff linter.
 - `ruff-format`: Runs the Ruff formatter.
+- `pip-compile requirements.in`: locks `requirements.in` to make `requirements.txt`
+- `pip-compile requirements-dev.in`: locks `requirements-dev.in` to make `requirements-dev.txt`
 
 ### Installing dependencies
 
