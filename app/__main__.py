@@ -37,19 +37,22 @@ async def repeat(interaction: discord.Interaction, what: str) -> None:
     )
 
 
-@client.tree.command(name="enable", description="Enables the game on the current channel")
+@client.tree.command(name="enable")
 async def enable(interaction: discord.Interaction):
+    """Enables the game on the current channel."""
     await interaction.response.send_message("Enabling the game on this channel")
 
 
-@client.tree.command(name="message", description="Sends a message to the current channel")
+@client.tree.command(name="message")
 @app_commands.describe(message="The message to send")
 async def message(interaction: discord.Interaction, message: str) -> None:
+    """Sends a message to the current channel."""
     await interaction.response.send_message(message)
 
 
-@client.tree.command(name="upgrade", description="None")
+@client.tree.command(name="upgrade")
 async def upgrade(interaction: discord.Interaction):
+    """Successfully upgraded."""
     await interaction.response.send_message("Upgraded")
 
 
