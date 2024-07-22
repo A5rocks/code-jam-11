@@ -1,168 +1,126 @@
+import collections
+from dataclasses import dataclass, replace
+from enum import StrEnum, auto
+
 import discord
-import time
-from discord import app_commands
-from dataclasses import dataclass
-import dataclasses
-from enum import auto, StrEnum
 
 
-class Priority(StrEnum):
+class MessagePriority(StrEnum):
+    """Enum to determine a user's priority."""
+
     TOP = auto()
     MIDDLE = auto()
     BOTTOM = auto()
 
 
-@dataclass
+@dataclass(frozen=True)
 class UserProfile:
-    member: discord.Member
-    guild: discord.Guild
-    priority: Priority = Priority.BOTTOM
+    """Class to hold user data such as their priority, amount of coins, and characters per second."""
+
+    priority: MessagePriority = MessagePriority.BOTTOM
     coins: int = 0
     cps: float = 0.1
 
 
 class Database:
-    def __init__(self):
-        self.enabled: dict[discord.Guild, list[discord.TextChannel]] = {}
-        self.activeProfiles: dict[discord.Guild, list[UserProfile]] = {}
+    """Class to store user profile and channel data."""
 
-    def enable_channel(self, channel: discord.TextChannel):
-        """
-        Enables the game in a channel
+    def __init__(self) -> None:
+        self.enabled: dict[discord.Guild, set[discord.TextChannel]] = collections.defaultdict(set)
+        self.activeProfiles: dict[discord.Guild, dict[discord.User, UserProfile]] = collections.defaultdict(
+            lambda: collections.defaultdict(None),
+        )
 
-        Parameters
-        ----------
+    def enable_channel(self, channel: discord.TextChannel) -> None:
+        """Enable the game in a channel.
 
-        channel (discord.TextChannel): The channel that the game is to be enabled in 
-        """
-        guild = channel.guild
-        if guild not in self.enabled:
-            self.enabled[guild] = []
-        self.enabled[guild].append(channel)
+        Arguments:
+        ---------
+        channel (discord.TextChannel): The channel that the game is to be enabled in
 
-    def disable_channel(self, channel: discord.TextChannel):
-        """
-        Disables the game in a channel
-
-        Parameters
-        ----------
-
-        channel (discord.TextChannel): The channel that the game is to be disabled in 
         """
         guild = channel.guild
-        if guild in self.enabled:
-            self.enabled[guild].remove(channel)
-        else:
-            raise KeyError
+        self.enabled[guild].add(channel)
 
-    def get_enabled_channels(self, guild):
+    def disable_channel(self, channel: discord.TextChannel) -> None:
+        """Disable the game in a channel.
+
+        Arguments:
+        ---------
+        channel (discord.TextChannel): The channel that the game is to be disabled in
+
         """
-        Get all the channels that the game is in enabled in
+        guild = channel.guild
+        self.enabled[guild].discard(channel)
 
-        Parameters
-        ----------
+    def get_enabled_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+        """Get all the channels that the game is in enabled in.
 
+        Arguments:
+        ---------
         guild (discord.Guild): The guild to check all enabled channels in
+
         """
-        self.enabled.get(guild, [])
+        return self.enabled[guild]
 
-    def get_active_profiles(self, guild):
-        """
-        Get all the profiles that the game is in enabled in
+    def get_active_profiles(self, guild: discord.Guild) -> list[UserProfile]:
+        """Get all the profiles that the game is in enabled in.
 
-        Parameters
-        ----------
-
+        Arguments:
+        ---------
         guild (discord.Guild): The guild to check all enabled profiles in
-        """
-        self.activeProfiles.get(guild, [])
-
-    def add_profile(self, member: discord.Member):
-        """
-        Add a profile to a specific guild
-
-        Parameters
-        ----------
-
-        member (discord.Member): The member whose profile should be added
 
         """
-        guild = member.guild
-        if guild not in self.activeProfiles:
-            self.activeProfiles[guild] = []
-        self.activeProfiles[guild].append(UserProfile(member, guild))
+        return self.activeProfiles[guild]
 
-    def remove_profile(self, member: discord.Member):
+    def add_profile(self, guild: discord.Guild, user: discord.User) -> None:
+        """Add a profile to a specific guild.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild that the user is in
+        user (discord.User): This user whose profile is to be added
+
         """
-        Remove a profile from a specific guild
+        self.activeProfiles[guild][user] = UserProfile(user, guild)
 
-        Parameters
-        ----------
+    def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+        """Remove a profile from a specific guild.
 
-        member (discord.Member): The member whose profile should be removed
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild that the user is in
+        user (discord.User): This user whose profile is to be removed
 
-
-        
         """
-        guild = member.guild
-        profile = self.convert_member_to_user_profile(guild, user)
-        if guild in self.activeProfiles:
-            self.activeProfiles[guild].remove(profile)
-        else:
-            raise KeyError
+        self.activeProfiles[guild].pop(user, None)
 
-    def get_profile(self, guild, user):
-        """
-        Get a profile from a specific guild, if the user object does not have the guild already attached to it
+    def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
+        """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
-        Parameters
-        ----------
-
+        Arguments:
+        ---------
         guild (discord.Guild): The guild that will be checked
         user (discord.User): The user whose profile that will be returned
 
         """
-        if guild in self.activeProfiles:
-            return self.convert_member_to_user_profile(guild, user)
-        else:
-            raise KeyError
-        
-    def update_profile(self,guild: discord.Guild, member: discord.Member, *, priority: (Priority | None)=None, coins: (int | None)=None, cps: (float | None)=None):
-        """
-        Updates a specific profile with new values
+        return self.activeProfiles[guild][user]
 
-        Supported values are:
-        priority (Priority): The priority of the profile
-        coins (int): The amount of coins in the profile
-        cps (float): The cps that the profile has
+    def update_profile(
+        self,
+        guild: discord.Guild,
+        user: discord.User,
+        new_profile: UserProfile,
+    ) -> None:
+        """Replace a profile with a new profile with updated values.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild in which the profile is in
+        user (discord.User): The user whose profile will be updated
+        new_profile (UserProfile): The new profile with updated values that is to be inserted.
 
         If this is not passed in a value of None is used and the profile is not changed
+
         """
-        
-        profile = self.convert_member_to_user_profile(guild, member)
-        for attribute, argument in {'priority': priority, 'coins': coins, 'cps': cps}: 
-            if argument is not None: profile.__setattr__(attribute, argument)
-    
-    def convert_member_to_user_profile(self, guild: discord.Guild, member: discord.Member) -> (UserProfile | None):
-        """
-        Helper method to convert a discord.Member or discord.User object to a UserProfile
-
-        This method goes through all active profiles in the guild and checks if the member matches the profile's member field
-        
-        Parameters
-        ----------
-
-        guild (discord.Guild): The guild in which the profiles are being looked up
-        member (discord.Member): The member that this method is trying to match
-
-        Returns
-        ----------
-
-        UserProfile if there is an existing profile for the member
-        None if there is not an existing profile
-        """
-
-        for profile in self.activeProfiles[guild]:
-            if profile.member.id == member.id: return profile
-        return None
-        
+        self.activeProfiles[guild][user] = replace(self.activeProfiles[guild][user], new_profile)
