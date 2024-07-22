@@ -37,5 +37,24 @@ async def repeat(interaction: discord.Interaction, what: str) -> None:
     )
 
 
+@client.tree.command()
+async def enable(interaction: discord.Interaction) -> None:
+    """Enable the game on the current channel."""
+    await interaction.response.send_message("Enabling the game on this channel")
+
+
+@client.tree.command()
+@app_commands.describe(message="The message to send")
+async def message(interaction: discord.Interaction, message: str) -> None:
+    """Send a message to the current channel."""
+    await interaction.response.send_message(message)
+
+
+@client.tree.command()
+async def upgrade(interaction: discord.Interaction) -> None:
+    """Upgrade."""
+    await interaction.response.send_message("Upgraded")
+
+
 if __name__ == "__main__":
     client.run(TOKEN)
