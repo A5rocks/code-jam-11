@@ -30,26 +30,17 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def enable(self, interaction: discord.Interaction) -> None:
         """Enable the game on the current channel."""
-        if interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message("Enabling the game on this channel")
-        else:
-            await interaction.response.send_message("You don't have permission to do that")
+        await interaction.response.send_message("Enabling the game on this channel")
 
     @app_commands.command()
     async def disable(self, interaction: discord.Interaction) -> None:
         """Disable the game on the current channel."""
-        if interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message("Disabling the game on this channel")
-        else:
-            await interaction.response.send_message("You don't have permission to do that")
+        await interaction.response.send_message("Disabling the game on this channel")
 
     @app_commands.command()
     async def reset(self, interaction: discord.Interaction) -> None:
         """Reset access to the game for all channels."""
-        if interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message("Resetting all channels access")
-        else:
-            await interaction.response.send_message("You don't have permission to do that")
+        await interaction.response.send_message("Resetting all channels access")
 
 
 client = DiscordClient(intents=discord.Intents.default())
@@ -78,7 +69,9 @@ async def upgrade(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("Upgraded")
 
 
-config = Config(name="config", description="Configures the game")
+config = Config(
+    name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
+)
 client.tree.add_command(config)
 
 if __name__ == "__main__":
