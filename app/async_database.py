@@ -20,7 +20,7 @@ class AsyncDatabase:
             await db.execute("""CREATE TABLE IF NOT EXISTS Users (
                                 user_id int,
                                 guild_id int,
-                                cps int,
+                                cps float,
                                 coins int)""")
             await db.commit()
 
@@ -97,7 +97,7 @@ class AsyncDatabase:
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be added
+        user (discord.Member): This user whose profile is to be added
 
         """
         async with aiosqlite.connect(self.db_path) as db:
@@ -107,13 +107,13 @@ class AsyncDatabase:
             )
             await db.commit()
 
-    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    async def remove_profile(self, guild: discord.Guild, user: discord.Member) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be removed
+        user (discord.Member): This user whose profile is to be removed
 
         """
         async with aiosqlite.connect(self.db_path) as db:
@@ -126,7 +126,7 @@ class AsyncDatabase:
         Arguments:
         ---------
         guild (discord.Guild): The guild that will be checked
-        user (discord.User): The user whose profile that will be returned
+        user (discord.Member): The user whose profile that will be returned
 
         """
         async with (
@@ -141,7 +141,7 @@ class AsyncDatabase:
     async def update_profile(
         self,
         guild: discord.Guild,
-        user: discord.User,
+        user: discord.Member,
         new_profile: UserProfile,
     ) -> None:
         """Replace a profile with a new profile with updated values.
@@ -149,7 +149,7 @@ class AsyncDatabase:
         Arguments:
         ---------
         guild (discord.Guild): The guild in which the profile is in
-        user (discord.User): The user whose profile will be updated
+        user (discord.Member): The user whose profile will be updated
         new_profile (UserProfile): The new profile with updated values that is to be inserted.
 
         If this is not passed in a value of None is used and the profile is not changed
