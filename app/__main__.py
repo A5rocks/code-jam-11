@@ -24,6 +24,25 @@ class DiscordClient(discord.Client):
         await self.tree.sync()
 
 
+class Config(app_commands.Group):
+    """Custom subclass of AppCommandGroup for config commands."""
+
+    @app_commands.command()
+    async def enable(self, interaction: discord.Interaction) -> None:
+        """Enable the game on the current channel."""
+        await interaction.response.send_message("Enabling the game on this channel")
+
+    @app_commands.command()
+    async def disable(self, interaction: discord.Interaction) -> None:
+        """Disable the game on the current channel."""
+        await interaction.response.send_message("Disabling the game on this channel")
+
+    @app_commands.command()
+    async def reset(self, interaction: discord.Interaction) -> None:
+        """Reset access to the game for all channels."""
+        await interaction.response.send_message("Resetting all channels access")
+
+
 client = DiscordClient(intents=discord.Intents.default())
 
 
@@ -38,14 +57,8 @@ async def repeat(interaction: discord.Interaction, what: str) -> None:
 
 
 @client.tree.command()
-async def enable(interaction: discord.Interaction) -> None:
-    """Enable the game on the current channel."""
-    await interaction.response.send_message("Enabling the game on this channel")
-
-
-@client.tree.command()
 @app_commands.describe(message="The message to send")
-async def message(interaction: discord.Interaction, message: str) -> None:
+async def send(interaction: discord.Interaction, message: str) -> None:
     """Send a message to the current channel."""
     await interaction.response.send_message(message)
 
@@ -55,6 +68,11 @@ async def upgrade(interaction: discord.Interaction) -> None:
     """Upgrade."""
     await interaction.response.send_message("Upgraded")
 
+
+config = Config(
+    name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
+)
+client.tree.add_command(config)
 
 if __name__ == "__main__":
     client.run(TOKEN)
