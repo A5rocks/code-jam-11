@@ -1,5 +1,5 @@
 import collections
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import StrEnum, auto
 
 import discord
@@ -28,7 +28,7 @@ class Database:
     def __init__(self) -> None:
         self.enabled: dict[discord.Guild, set[discord.TextChannel]] = collections.defaultdict(set)
         self.activeProfiles: dict[discord.Guild, dict[discord.User, UserProfile]] = collections.defaultdict(
-            lambda: collections.defaultdict(None),
+            lambda: collections.defaultdict(UserProfile),
         )
 
     def enable_channel(self, channel: discord.TextChannel) -> None:
@@ -53,7 +53,7 @@ class Database:
         guild = channel.guild
         self.enabled[guild].discard(channel)
 
-    def get_enabled_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    def get_enabled_channels(self, guild: discord.Guild) -> set[discord.TextChannel]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
@@ -63,7 +63,7 @@ class Database:
         """
         return self.enabled[guild]
 
-    def get_active_profiles(self, guild: discord.Guild) -> list[UserProfile]:
+    def get_active_profiles(self, guild: discord.Guild) -> dict[discord.User, UserProfile]:
         """Get all the profiles that the game is in enabled in.
 
         Arguments:
@@ -82,7 +82,7 @@ class Database:
         user (discord.User): This user whose profile is to be added
 
         """
-        self.activeProfiles[guild][user] = UserProfile(user, guild)
+        self.activeProfiles[guild][user] = UserProfile()
 
     def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
         """Remove a profile from a specific guild.
@@ -123,4 +123,4 @@ class Database:
         If this is not passed in a value of None is used and the profile is not changed
 
         """
-        self.activeProfiles[guild][user] = replace(self.activeProfiles[guild][user], new_profile)
+        self.activeProfiles[guild][user] = new_profile
