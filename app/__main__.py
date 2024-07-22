@@ -52,7 +52,7 @@ async def message(interaction: discord.Interaction, message: str) -> None:
 
 @client.tree.command()
 async def upgrade(interaction: discord.Interaction) -> None:
-    """Upgrade"""
+    """Upgrade."""
     await interaction.response.send_message("Upgraded")
 
 
