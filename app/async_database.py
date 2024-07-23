@@ -40,7 +40,7 @@ class AsyncDatabase:
         await self.connection.commit()
 
     async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
-        """Get all the channels that the game is in enabled in for a guild.
+        """Get all the channels that the game is enabled in for a guild.
 
         Arguments:
         ---------
@@ -48,12 +48,12 @@ class AsyncDatabase:
 
         """
         async with (
-            self.connection.execute("SELECT * FROM Guilds WHERE guild_id = ?", (guild.id)) as cursor,
+            self.connection.execute("SELECT channel FROM Guilds WHERE guild_id = ?", (guild.id)) as cursor,
         ):
-            return [discord.Client.get_channel(row[1]) for row in cursor]
+            return [discord.Client.get_channel(row[0]) for row in cursor]
 
     async def get_active_profiles(self, guild: discord.Guild) -> list[UserProfile]:
-        """Get all the profiles that the game is in enabled in.
+        """Get all the profiles that the game is enabled in.
 
         Arguments:
         ---------
@@ -61,60 +61,62 @@ class AsyncDatabase:
 
         """
         async with (
-            self.connection.execute("SELECT * FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
+            self.connection.execute("SELECT user_id, coins, cps FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
         ):
-            return [UserProfile(coins=row[3], cps=row[2]) for row in cursor]
+            return [UserProfile(user=discord.Client.get_user(row[0]), coins=row[1], cps=row[2]) for row in cursor]
 
-    async def add_profile(self, guild: discord.Guild, user: discord.Member) -> None:
+    async def add_profile(self, guild: discord.Guild, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user (discord.Member): This user whose profile is to be added
+        user_profile (UserProfile): This user whose profile is to be added
 
         """
         await self.connection.execute(
             "INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?,?,?,?)",
-            (user.id, guild.id, UserProfile().cps, UserProfile().coins),
+            (user_profile.user.id, guild.id, user_profile.cps, user_profile.coins),
         )
         await self.connection.commit()
 
-    async def remove_profile(self, guild: discord.Guild, user: discord.Member) -> None:
+    async def remove_profile(self, guild: discord.Guild, user_profile: UserProfile) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user (discord.Member): This user whose profile is to be removed
+        user_profile (UserProfile): This user whose profile is to be removed
 
         """
-        await self.connection.execute("DELETE FROM Users WHERE user_id=? AND guild_id=?", (user.id, guild.id))
+        await self.connection.execute(
+            "DELETE FROM Users WHERE user_id=? AND guild_id=?", (user_profile.user.id, guild.id)
+        )
         await self.connection.commit()
 
-    async def get_profile(self, guild: discord.Guild, user: discord.Member) -> UserProfile | None:
+    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile | None:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that will be checked
-        user (discord.Member): The user whose profile that will be returned
+        user (discord.User): The user whose profile that will be returned
 
         """
         async with (
             self.connection.execute(
-                "SELECT * FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)
+                "SELECT user_id, coins, cps FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)
             ) as cursor,
         ):
             async for row in cursor:
-                return UserProfile(coins=row[3], cps=row[2])
+                return UserProfile(user=discord.Client.get_user(row[0]), coins=row[1], cps=row[2])
 
         return None
 
     async def update_profile(
         self,
         guild: discord.Guild,
-        user: discord.Member,
+        user: discord.User,
         new_profile: UserProfile,
     ) -> None:
         """Replace a profile with a new profile with updated values.
@@ -122,10 +124,8 @@ class AsyncDatabase:
         Arguments:
         ---------
         guild (discord.Guild): The guild in which the profile is in
-        user (discord.Member): The user whose profile will be updated
+        user (discord.User): The user whose profile will be updated
         new_profile (UserProfile): The new profile with updated values that is to be inserted.
-
-        If this is not passed in a value of None is used and the profile is not changed
 
         """
         await self.connection.execute(

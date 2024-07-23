@@ -20,6 +20,7 @@ class UserProfile:
     priority: MessagePriority = MessagePriority.BOTTOM
     coins: int = 0
     cps: float = 0.1
+    user: discord.User
 
 
 class Database:
