@@ -39,6 +39,19 @@ class AsyncDatabase:
         await self.connection.execute("DELETE FROM Guilds WHERE id=? AND channel=?", (channel.guild.id, channel.id))
         await self.connection.commit()
 
+    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+        """Get all the channels that the game is in enabled in for a guild.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild to check all enabled profiles in
+
+        """
+        async with (
+            self.connection.execute("SELECT * FROM Guilds WHERE guild_id = ?", (guild.id)) as cursor,
+        ):
+            return [discord.Client.get_channel(row[1]) for row in cursor]
+
     async def get_active_profiles(self, guild: discord.Guild) -> list[UserProfile]:
         """Get all the profiles that the game is in enabled in.
 
@@ -48,8 +61,7 @@ class AsyncDatabase:
 
         """
         async with (
-            aiosqlite.connect(db_path) as db,
-            db.execute("SELECT * FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
+            self.connection.execute("SELECT * FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
         ):
             return [UserProfile(coins=row[3], cps=row[2]) for row in cursor]
 
@@ -90,8 +102,9 @@ class AsyncDatabase:
 
         """
         async with (
-            aiosqlite.connect(db_path) as db,
-            db.execute("SELECT * FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)) as cursor,
+            self.connection.execute(
+                "SELECT * FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)
+            ) as cursor,
         ):
             async for row in cursor:
                 return UserProfile(coins=row[3], cps=row[2])
