@@ -2,8 +2,9 @@ import os
 
 import discord
 import dotenv
-from database import Database
 from discord import app_commands
+
+from .database import Database
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
@@ -16,6 +17,7 @@ class DiscordClient(discord.Client):
         super().__init__(intents=intents)
 
         self.tree = app_commands.CommandTree(self)
+        self.database = Database()
 
     async def setup_hook(self) -> None:
         """Run async setup code before our bot connects.
@@ -26,7 +28,6 @@ class DiscordClient(discord.Client):
 
 
 client = DiscordClient(intents=discord.Intents.default())
-database = Database()
 
 
 class Config(app_commands.Group):
@@ -35,27 +36,27 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def enable(self, interaction: discord.Interaction) -> None:
         """Enable the game on the current channel."""
-        if interaction.channel in database.get_enabled_channels(interaction.guild):
+        if interaction.channel in client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already enabled on this channel")
         else:
-            database.enable_channel(interaction.channel)
-            await interaction.response.send_message("Enabling the game on this channel")
+            client.database.enable_channel(interaction.channel)
+            await interaction.response.send_message("Enabled the game on this channel")
 
     @app_commands.command()
     async def disable(self, interaction: discord.Interaction) -> None:
         """Disable the game on the current channel."""
-        if interaction.channel not in database.get_enabled_channels(interaction.guild):
+        if interaction.channel not in client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already disabled on this channel")
         else:
-            database.disable_channel(interaction.channel)
-            await interaction.response.send_message("Disabling the game on this channel")
+            client.database.disable_channel(interaction.channel)
+            await interaction.response.send_message("Disabled the game on this channel")
 
     @app_commands.command()
     async def reset(self, interaction: discord.Interaction) -> None:
         """Reset access to the game for all channels."""
-        for channel in database.get_enabled_channels(interaction.guild):
-            database.disable_channel(channel)
-        await interaction.response.send_message("Resetting all channels access")
+        for channel in client.database.get_enabled_channels(interaction.guild):
+            client.database.disable_channel(channel)
+        await interaction.response.send_message("Resetted all channels access")
 
 
 @client.tree.command()
