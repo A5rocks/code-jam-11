@@ -44,7 +44,7 @@ class AsyncDatabase:
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild to check all enabled profiles in
+        guild (discord.Guild): The guild to check all enabled channels in
 
         """
         async with (
@@ -65,33 +65,32 @@ class AsyncDatabase:
         ):
             return [UserProfile(coins=row[0], cps=row[1]) for row in cursor]
 
-    async def add_profile(self, guild: discord.Guild, user_profile: UserProfile) -> None:
+    async def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user_profile (UserProfile): This user whose profile is to be added
+        user (discord.User): The discord user to be added
+        user_profile (UserProfile): The UserProfile data to be added
 
         """
         await self.connection.execute(
             "INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?,?,?,?)",
-            (user_profile.user.id, guild.id, user_profile.cps, user_profile.coins),
+            (user.id, guild.id, user_profile.cps, user_profile.coins),
         )
         await self.connection.commit()
 
-    async def remove_profile(self, guild: discord.Guild, user_profile: UserProfile) -> None:
+    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
-        user_profile (UserProfile): This user whose profile is to be removed
+        user (discord.User): This user whose profile is to be removed
 
         """
-        await self.connection.execute(
-            "DELETE FROM Users WHERE user_id=? AND guild_id=?", (user_profile.user.id, guild.id)
-        )
+        await self.connection.execute("DELETE FROM Users WHERE user_id=? AND guild_id=?", (user.id, guild.id))
         await self.connection.commit()
 
     async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile | None:
@@ -125,7 +124,7 @@ class AsyncDatabase:
         ---------
         guild (discord.Guild): The guild in which the profile is in
         user (discord.User): The user whose profile will be updated
-        new_profile (UserProfile): The new profile with updated values that is to be inserted.
+        new_profile (UserProfile): The new profile with updated values that is to be inserted
 
         """
         await self.connection.execute(
