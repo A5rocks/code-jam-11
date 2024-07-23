@@ -61,9 +61,9 @@ class AsyncDatabase:
 
         """
         async with (
-            self.connection.execute("SELECT user_id, coins, cps FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
+            self.connection.execute("SELECT coins, cps FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
         ):
-            return [UserProfile(user=discord.Client.get_user(row[0]), coins=row[1], cps=row[2]) for row in cursor]
+            return [UserProfile(coins=row[0], cps=row[1]) for row in cursor]
 
     async def add_profile(self, guild: discord.Guild, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
@@ -105,11 +105,11 @@ class AsyncDatabase:
         """
         async with (
             self.connection.execute(
-                "SELECT user_id, coins, cps FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)
+                "SELECT coins, cps FROM Users WHERE guild_id = ? AND user_id = ?", (guild.id, user.id)
             ) as cursor,
         ):
             async for row in cursor:
-                return UserProfile(user=discord.Client.get_user(row[0]), coins=row[1], cps=row[2])
+                return UserProfile(coins=row[0], cps=row[1])
 
         return None
 
