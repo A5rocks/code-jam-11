@@ -2,9 +2,8 @@ import os
 
 import discord
 import dotenv
+from database import Database
 from discord import app_commands
-
-from .database import Database
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
