@@ -102,12 +102,13 @@ async def profile(interaction: discord.Interaction, user: discord.Member = None)
         return
 
     profile = client.database.get_profile(interaction.guild, user)
-    await interaction.response.send_message(
-        f"""test stats for {user.display_name}:
-        coins: {profile.coins}
-        cps: {profile.cps}
-        priority: {profile.priority}"""
-    )
+
+    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else "" } Profile")
+    embed.add_field(name="Coins", value=profile.coins)
+    embed.add_field(name="CPS", value=profile.cps)
+    embed.add_field(name="Message Priority", value=profile.priority.capitalize())
+
+    await interaction.response.send_message(embed=embed)
 
 
 config = Config(
