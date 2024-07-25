@@ -36,26 +36,26 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def enable(self, interaction: Interaction) -> None:
         """Enable the game on the current channel."""
-        if interaction.channel in interaction.client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel in client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already enabled on this channel")
         else:
-            interaction.client.database.enable_channel(interaction.channel)
+            client.database.enable_channel(interaction.channel)
             await interaction.response.send_message("Enabled the game on this channel")
 
     @app_commands.command()
     async def disable(self, interaction: Interaction) -> None:
         """Disable the game on the current channel."""
-        if interaction.channel not in interaction.client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel not in client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already disabled on this channel")
         else:
-            interaction.client.database.disable_channel(interaction.channel)
+            client.database.disable_channel(interaction.channel)
             await interaction.response.send_message("Disabled the game on this channel")
 
     @app_commands.command()
     async def reset(self, interaction: Interaction) -> None:
         """Reset access to the game for all channels."""
-        for channel in interaction.client.database.get_enabled_channels(interaction.guild):
-            interaction.client.database.disable_channel(channel)
+        for channel in client.database.get_enabled_channels(interaction.guild):
+            client.database.disable_channel(channel)
         await interaction.response.send_message("Resetted all channels access")
 
 
