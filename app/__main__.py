@@ -58,6 +58,7 @@ class Config(app_commands.Group):
             interaction.client.database.disable_channel(channel)
         await interaction.response.send_message("Resetted all channels access")
 
+
 @client.event
 async def on_message(message: discord.Message) -> None:
     """Check every message to see if it should be deleted from an enabled channel."""
@@ -66,7 +67,8 @@ async def on_message(message: discord.Message) -> None:
             return
 
         await message.delete()
-        
+
+
 @client.tree.command()
 @app_commands.describe(what="what to repeat")
 async def repeat(interaction: Interaction, what: str) -> None:
