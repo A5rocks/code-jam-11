@@ -91,6 +91,25 @@ async def upgrade(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("Upgraded")
 
 
+@client.tree.command(description="Check out your stats or another user's")
+@app_commands.describe(user="The user to check the stats of. Defaults to you")
+async def profile(interaction: discord.Interaction, user: discord.Member = None) -> None:
+    """Send a user their profile's stats."""
+    user = user or interaction.user
+
+    if user.bot:
+        await interaction.response.send_message("Bots cannot play the game :(")
+        return
+
+    profile = client.database.get_profile(interaction.guild, user)
+    await interaction.response.send_message(
+        f"""test stats for {user.display_name}:
+        coins: {profile.coins}
+        cps: {profile.cps}
+        priority: {profile.priority}"""
+    )
+
+
 config = Config(
     name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
 )
