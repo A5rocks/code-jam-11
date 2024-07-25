@@ -2,6 +2,7 @@ import os
 
 import discord
 import dotenv
+from database import Database
 from discord import app_commands
 from discord.ui import Button, View
 
@@ -51,6 +52,7 @@ class DiscordClient(discord.Client):
         super().__init__(intents=intents)
 
         self.tree = app_commands.CommandTree(self)
+        self.database = Database()
 
     async def setup_hook(self) -> None:
         """Run async setup code before our bot connects.
@@ -64,6 +66,45 @@ class DiscordClient(discord.Client):
 client = DiscordClient(intents=discord.Intents.default())
 
 
+class Config(app_commands.Group):
+    """Custom subclass of AppCommandGroup for config commands."""
+
+    @app_commands.command()
+    async def enable(self, interaction: discord.Interaction) -> None:
+        """Enable the game on the current channel."""
+        if interaction.channel in client.database.get_enabled_channels(interaction.guild):
+            await interaction.response.send_message("The game is already enabled on this channel")
+        else:
+            client.database.enable_channel(interaction.channel)
+            await interaction.response.send_message("Enabled the game on this channel")
+
+    @app_commands.command()
+    async def disable(self, interaction: discord.Interaction) -> None:
+        """Disable the game on the current channel."""
+        if interaction.channel not in client.database.get_enabled_channels(interaction.guild):
+            await interaction.response.send_message("The game is already disabled on this channel")
+        else:
+            client.database.disable_channel(interaction.channel)
+            await interaction.response.send_message("Disabled the game on this channel")
+
+    @app_commands.command()
+    async def reset(self, interaction: discord.Interaction) -> None:
+        """Reset access to the game for all channels."""
+        for channel in client.database.get_enabled_channels(interaction.guild):
+            client.database.disable_channel(channel)
+        await interaction.response.send_message("Resetted all channels access")
+
+
+@client.event
+async def on_message(message: discord.Message) -> None:
+    """Check every message to see if it should be deleted from an enabled channel."""
+    if message.guild:
+        if message.author == client.user or message.channel not in client.database.get_enabled_channels(message.guild):
+            return
+
+        await message.delete()
+
+
 @client.tree.command()
 @app_commands.describe(what="what to repeat")
 async def repeat(interaction: discord.Interaction, what: str) -> None:
@@ -75,14 +116,8 @@ async def repeat(interaction: discord.Interaction, what: str) -> None:
 
 
 @client.tree.command()
-async def enable(interaction: discord.Interaction) -> None:
-    """Enable the game on the current channel."""
-    await interaction.response.send_message("Enabling the game on this channel")
-
-
-@client.tree.command()
 @app_commands.describe(message="The message to send")
-async def message(interaction: discord.Interaction, message: str) -> None:
+async def send(interaction: discord.Interaction, message: str) -> None:
     """Send a message to the current channel."""
     await interaction.response.send_message(message)
 
@@ -96,6 +131,11 @@ async def upgrade(interaction: discord.Interaction) -> None:
     view = UpgradeView()
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+
+config = Config(
+    name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
+)
+client.tree.add_command(config)
 
 if __name__ == "__main__":
     client.run(TOKEN)

@@ -24,5 +24,7 @@ USER appuser
 EXPOSE 8080
 # --- end copied parts
 
+STOPSIGNAL SIGINT
+
 COPY ./app ./app
-CMD python app
+CMD ["python", "app"]
