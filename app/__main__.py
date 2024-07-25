@@ -61,10 +61,11 @@ class Config(app_commands.Group):
 @client.event
 async def on_message(message: discord.Message) -> None:
     """Check every message to see if it should be deleted from an enabled channel."""
-    if message.author == client.user or message.channel not in client.database.get_enabled_channels(message.guild):
-        return
+    if message.guild:
+        if message.author == client.user or message.channel not in client.database.get_enabled_channels(message.guild):
+            return
 
-    await message.delete()
+        await message.delete()
 
 
 @client.tree.command()
