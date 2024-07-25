@@ -28,14 +28,9 @@ class Editable(Protocol):
 class Sender:
     """Storage for messages that are to be sent out slowly."""
 
-<<<<<<< HEAD
-    _queue: list[tuple[float, str, discord.User]] = dataclasses.field(init=False, default_factory=list)
-    _started: bool = dataclasses.field(init=False, default=False)
-=======
     _queue: list[tuple[float, discord.User]] = dataclasses.field(init=False, default_factory=list)
     _started: bool = dataclasses.field(init=False, default=False)
     _buffers: dict[discord.User, str] = dataclasses.field(init=False, default_factory=dict)
->>>>>>> f719751 (Handle latest database changes)
 
     async def start(
         self, send: Callable[[str], Awaitable[Editable]], cps: Callable[[discord.User], Awaitable[float]]
@@ -55,18 +50,10 @@ class Sender:
         last_send = loop.time() - 1
 
         while self._queue:
-<<<<<<< HEAD
-            when, what, who = heapq.heappop(self._queue)
-            await asyncio.sleep(when - loop.time())
-
-            char = what[0]  # should this split on graphenes instead?
-            what = what[1:]
-=======
             when, who = heapq.heappop(self._queue)
             await asyncio.sleep(when - loop.time())
 
             char = self._buffers[who][0]  # should this split on graphenes instead?
->>>>>>> f719751 (Handle latest database changes)
             buffer += char
 
             if loop.time() >= last_send + 1:
@@ -88,30 +75,22 @@ class Sender:
                     last = await send(buffer)
 
             new_cps = await cps(who)
-<<<<<<< HEAD
-            if what:
-                heapq.heappush(self._queue, (when + 1 / new_cps, what, who))
-=======
             # TODO: add 1 coin to `who` here
             if len(self._buffers[who]) > 1:
                 heapq.heappush(self._queue, (when + 1 / new_cps, who))
                 self._buffers[who] = self._buffers[who][1:]
             else:
                 del self._buffers[who]
->>>>>>> f719751 (Handle latest database changes)
 
         self._started = False
 
     def add_item(self, who: discord.User, cps: float, what: str) -> None:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
-<<<<<<< HEAD
-        heapq.heappush(self._queue, (loop.time() + 1 / cps, what, who))
-=======
         if who in self._buffers:
-            heapq.heappush(self._queue, (loop.time() + 1 / cps, who))
             self._buffers[who] = self._buffers[who] + what
         else:
+            heapq.heappush(self._queue, (loop.time() + 1 / cps, who))
             self._buffers[who] = what
 
 
