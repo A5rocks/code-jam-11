@@ -27,34 +27,35 @@ class DiscordClient(discord.Client):
 
 
 client = DiscordClient(intents=discord.Intents.default())
+type Interaction = discord.Interaction[DiscordClient]
 
 
 class Config(app_commands.Group):
     """Custom subclass of AppCommandGroup for config commands."""
 
     @app_commands.command()
-    async def enable(self, interaction: discord.Interaction) -> None:
+    async def enable(self, interaction: Interaction) -> None:
         """Enable the game on the current channel."""
-        if interaction.channel in client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel in interaction.client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already enabled on this channel")
         else:
-            client.database.enable_channel(interaction.channel)
+            interaction.client.database.enable_channel(interaction.channel)
             await interaction.response.send_message("Enabled the game on this channel")
 
     @app_commands.command()
-    async def disable(self, interaction: discord.Interaction) -> None:
+    async def disable(self, interaction: Interaction) -> None:
         """Disable the game on the current channel."""
-        if interaction.channel not in client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel not in interaction.client.database.get_enabled_channels(interaction.guild):
             await interaction.response.send_message("The game is already disabled on this channel")
         else:
-            client.database.disable_channel(interaction.channel)
+            interaction.client.database.disable_channel(interaction.channel)
             await interaction.response.send_message("Disabled the game on this channel")
 
     @app_commands.command()
-    async def reset(self, interaction: discord.Interaction) -> None:
+    async def reset(self, interaction: Interaction) -> None:
         """Reset access to the game for all channels."""
-        for channel in client.database.get_enabled_channels(interaction.guild):
-            client.database.disable_channel(channel)
+        for channel in interaction.client.database.get_enabled_channels(interaction.guild):
+            interaction.client.database.disable_channel(channel)
         await interaction.response.send_message("Resetted all channels access")
 
 
@@ -70,7 +71,7 @@ async def on_message(message: discord.Message) -> None:
 
 @client.tree.command()
 @app_commands.describe(what="what to repeat")
-async def repeat(interaction: discord.Interaction, what: str) -> None:
+async def repeat(interaction: Interaction, what: str) -> None:
     """Repeats what someone says."""
     await interaction.response.send_message(
         f"Repeating after you: {what}",
@@ -80,13 +81,13 @@ async def repeat(interaction: discord.Interaction, what: str) -> None:
 
 @client.tree.command()
 @app_commands.describe(message="The message to send")
-async def send(interaction: discord.Interaction, message: str) -> None:
+async def send(interaction: Interaction, message: str) -> None:
     """Send a message to the current channel."""
     await interaction.response.send_message(message)
 
 
 @client.tree.command()
-async def upgrade(interaction: discord.Interaction) -> None:
+async def upgrade(interaction: Interaction) -> None:
     """Upgrade."""
     await interaction.response.send_message("Upgraded")
 
