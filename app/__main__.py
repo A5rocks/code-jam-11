@@ -19,12 +19,9 @@ class UpgradeView(View):
     async def cps_upgrade(self, interaction: discord.Interaction, button: Button) -> None:
         """Upgrade a user's CPS."""
         button.label = "CPS Selected"
-        if interaction.message is not None:
-            await interaction.message.edit(view=self)
-        await interaction.response.send_message(
-            "Dummy message confirming CPS method works",
-            ephemeral=True,
-        )
+        await interaction.response.defer()
+        message = await interaction.original_response()
+        await interaction.edit_original_response(embed=message.embeds[0], view=self)
 
     @discord.ui.button(
         label="Upgrade Priority",
@@ -34,24 +31,17 @@ class UpgradeView(View):
     async def priority_upgrade(self, interaction: discord.Interaction, button: Button) -> None:
         """Upgrade a user's priority."""
         button.label = "Priority Selected"
-        if interaction.message is not None:
-            await interaction.message.edit(view=self)
-        await interaction.response.send_message(
-            "Dummy message confirming priority upgrade method works",
-            ephemeral=True,
-        )
+        await interaction.response.defer()
+        message = await interaction.original_response()
+        await interaction.edit_original_response(embed=message.embeds[0], view=self)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
     async def cancel(self, interaction: discord.Interaction, button: Button) -> None:
         """Cancel the upgrade process."""
         button.label = "Cancelled"
-        self.stop()
-        if interaction.message is not None:
-            await interaction.message.edit(content="Cancelled.", view=None)
-        await interaction.response.send_message(
-            "Stopped the view to signify cancel method",
-            ephemeral=True,
-        )
+        await interaction.response.defer()
+        message = await interaction.original_response()
+        await interaction.edit_original_response(embed=message.embeds[0], view=self)
 
 
 class DiscordClient(discord.Client):
@@ -101,10 +91,10 @@ async def message(interaction: discord.Interaction, message: str) -> None:
 async def upgrade(interaction: discord.Interaction) -> None:
     """Upgrade."""
     embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
-    embed.add_field(name="Better CPS", value="Increase the amount of characters you can send per second")
-    embed.add_field(name="Higher Priority", value="Increase the priority of your messages")
+    embed.add_field(name="Better CPS", value="Increase the amount of characters you can send per second\nCosts [cost]")
+    embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nCosts [cost]")
     view = UpgradeView()
-    await interaction.response.send_message(embed=embed, view=view)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 if __name__ == "__main__":
