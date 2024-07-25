@@ -27,7 +27,7 @@ class DiscordClient(discord.Client):
 
 
 client = DiscordClient(intents=discord.Intents.default())
-Interaction: type = discord.Interaction[DiscordClient]
+type Interaction = discord.Interaction[DiscordClient]
 
 
 class Config(app_commands.Group):
