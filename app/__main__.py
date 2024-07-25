@@ -92,6 +92,26 @@ async def upgrade(interaction: Interaction) -> None:
     await interaction.response.send_message("Upgraded")
 
 
+@client.tree.command(description="Check out your stats or another user's")
+@app_commands.describe(user="The user to check the stats of. Defaults to you")
+async def profile(interaction: discord.Interaction, user: discord.Member = None) -> None:
+    """Send a user their profile's stats."""
+    user = user or interaction.user
+
+    if user.bot:
+        await interaction.response.send_message("Bots cannot play the game :(")
+        return
+
+    profile = client.database.get_profile(interaction.guild, user)
+
+    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else "" } Profile")
+    embed.add_field(name="Coins", value=profile.coins)
+    embed.add_field(name="CPS", value=profile.cps)
+    embed.add_field(name="Message Priority", value=profile.priority.capitalize())
+
+    await interaction.response.send_message(embed=embed)
+
+
 config = Config(
     name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
 )
