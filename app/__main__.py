@@ -2,12 +2,16 @@ import os
 
 import discord
 import dotenv
-from database import Database
+from database import Database, MessagePriority, UserProfile
 from discord import app_commands
 from discord.ui import Button, View
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
+PRIOTIY_COST: dict[MessagePriority, int] = {MessagePriority.BOTTOM: 500, MessagePriority.MIDDLE: 2500}
+# PRIORITY_COST[current priority] -> cost to upgrade
+CPS_COST: dict[float, int] = {0.1: 1, 1: 10, 5: 25, 10: 50}
+# CPS_COST[current_cps] -> cost to upgrade
 
 
 class UpgradeView(View):
@@ -21,8 +25,7 @@ class UpgradeView(View):
         """Upgrade a user's CPS."""
         button.label = "CPS Selected"
         await interaction.response.defer()
-        message = await interaction.original_response()
-        await interaction.edit_original_response(embed=message.embeds[0], view=self)
+        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
 
     @discord.ui.button(
         label="Upgrade Priority",
@@ -33,8 +36,7 @@ class UpgradeView(View):
         """Upgrade a user's priority."""
         button.label = "Priority Selected"
         await interaction.response.defer()
-        message = await interaction.original_response()
-        await interaction.edit_original_response(embed=message.embeds[0], view=self)
+        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
     async def cancel(self, interaction: discord.Interaction, button: Button) -> None:
@@ -43,6 +45,18 @@ class UpgradeView(View):
         await interaction.response.defer()
         message = await interaction.original_response()
         await interaction.edit_original_response(embed=message.embeds[0], view=self)
+
+    async def _create_embed(self, interaction: discord.Interaction) -> discord.Embed:
+        """Create a custom embed to accompany the edited message upon upgrade."""
+        profile: UserProfile = client.database.get_profile(interaction.guild, interaction.user)
+        priority_cost = PRIOTIY_COST[profile.priority]
+        cps_cost = CPS_COST[profile.cps]
+        embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
+        embed.add_field(
+            name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
+        )
+        embed.add_field(name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}")
+        return embed
 
 
 class DiscordClient(discord.Client):
