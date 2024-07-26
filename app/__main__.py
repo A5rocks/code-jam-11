@@ -71,10 +71,14 @@ class DiscordClient(discord.Client):
     async def setup_hook(self) -> None:
         """Run async setup code before our bot connects.
 
-        Right now this just synchronizes our application commands with Discord.
+        Synchronizes our application commands with Discord and sets up the bot's description.
         """
         self.add_view(UpgradeView())
         await self.tree.sync()
+
+        await (await self.application_info()).edit(
+            description="Enable a channel with /config enable and use /send to send messages!"
+        )
 
 
 client = DiscordClient(intents=discord.Intents.default())
