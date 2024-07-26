@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 MAX_MESSAGE_LENGTH = 2000
-
+MAX_QUEUE_TIME = 300
 
 class Editable(Protocol):
     """Describes things that can be edited."""
@@ -87,6 +87,9 @@ class Sender:
     def add_item(self, who: discord.User, cps: float, what: str) -> None:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
+
+        if (len(self._buffers.get(who, "")) + len(what)) / cps > MAX_QUEUE_TIME or len(what) / cps > MAX_QUEUE_TIME:
+            return "That is too much text to send at once."
         if who in self._buffers:
             self._buffers[who] = self._buffers[who] + what
         else:
@@ -104,5 +107,8 @@ async def send(client: DiscordClient, where: discord.Channel, who: discord.User,
         profile = await client.database.get_profile(where.guild, p)
         return profile.cps
 
-    senders[where].add_item(who, await cps(who), what)
-    asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
+    if senders[where].add_item(who, await cps(who), what) != None:
+        return "That is too much text to send at once."
+    else:
+        senders[where].add_item(who, await cps(who), what)
+        asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
