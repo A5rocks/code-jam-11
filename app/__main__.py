@@ -74,12 +74,13 @@ class DiscordClient(discord.Client):
         Synchronizes our application commands with Discord and sets up the bot's description.
         """
         self.add_view(UpgradeView())
-        await self.tree.sync()
+        app_commands = await self.tree.sync()
 
+        command_id_map = {cmd.name: cmd.id for cmd in app_commands}
         await (await self.application_info()).edit(
             description=(
-                "Enable a channel with </config enable:1266082362345656333>"
-                "and use </send:1266082362345656332> to send messages!"
+                f"Enable a channel with </config enable:{command_id_map["config"]}> "
+                f"and use </send:{command_id_map["send"]}> to send messages!"
             )
         )
 
