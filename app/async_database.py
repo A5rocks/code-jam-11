@@ -5,8 +5,6 @@ import aiosqlite
 import discord
 from database import AbstractDatabase, UserProfile
 
-db_path = "demo.db"
-
 
 class AsyncDatabase(AbstractDatabase):
     """Class to store user profile and channel data asynchronously."""
@@ -28,18 +26,19 @@ class AsyncDatabase(AbstractDatabase):
         )
         await self.connection.commit()
 
-    async def disable_channel(self, channel: discord.TextChannel) -> None:
+    async def disable_channel(self, guild: discord.Guild, channel_id: int) -> None:
         """Disable the game in a channel.
 
         Arguments:
         ---------
-        channel (discord.TextChannel): The channel that the game is to be disabled in
+        guild (discord.Guild): The guild that the game is to be disabled in
+        channel_id (int): The channel that the game is to be disabled in
 
         """
-        await self.connection.execute("DELETE FROM Guilds WHERE id=? AND channel=?", (channel.guild.id, channel.id))
+        await self.connection.execute("DELETE FROM Guilds WHERE id=? AND channel=?", (guild.id, channel_id))
         await self.connection.commit()
 
-    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    async def get_channels(self, guild: discord.Guild) -> list[int]:
         """Get all the channels that the game is enabled in for a guild.
 
         Arguments:
@@ -48,9 +47,9 @@ class AsyncDatabase(AbstractDatabase):
 
         """
         async with (
-            self.connection.execute("SELECT channel FROM Guilds WHERE guild_id = ?", (guild.id)) as cursor,
+            self.connection.execute("SELECT channel FROM Guilds WHERE id = ?", (guild.id,)) as cursor,
         ):
-            return [discord.Client.get_channel(row[0]) for row in cursor]
+            return [row[0] async for row in cursor]
 
     async def add_profile(
         self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None
@@ -69,7 +68,7 @@ class AsyncDatabase(AbstractDatabase):
 
         await self.connection.execute(
             "INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?,?,?,?)",
-            (user.id, guild.id, user_profile.cps, user_profile.coins),
+            (user.id, guild.id, int(user_profile.cps * 10), user_profile.coins),
         )
         await self.connection.commit()
 
@@ -85,7 +84,7 @@ class AsyncDatabase(AbstractDatabase):
         await self.connection.execute("DELETE FROM Users WHERE user_id=? AND guild_id=?", (user.id, guild.id))
         await self.connection.commit()
 
-    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile | None:
+    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
@@ -100,9 +99,9 @@ class AsyncDatabase(AbstractDatabase):
             ) as cursor,
         ):
             async for row in cursor:
-                return UserProfile(coins=row[0], cps=row[1])
+                return UserProfile(coins=row[0], cps=row[1] / 10)
 
-        return None
+        return UserProfile()
 
     async def update_profile(
         self,
@@ -123,13 +122,13 @@ class AsyncDatabase(AbstractDatabase):
             """UPDATE Users
                             SET cps = ?, coins = ?
                             WHERE user_id = ? AND guild_id= ?""",
-            (new_profile.cps, new_profile.coins, user.id, guild.id),
+            (int(new_profile.cps * 10), new_profile.coins, user.id, guild.id),
         )
         await self.connection.commit()
 
 
 @contextlib.asynccontextmanager
-async def open_database(path: str) -> typing.Generator[AsyncDatabase]:
+async def open_database(path: str) -> typing.AsyncIterator[AsyncDatabase]:
     """Open a database through a shared connection.
 
     Arguments:
@@ -146,7 +145,7 @@ async def open_database(path: str) -> typing.Generator[AsyncDatabase]:
         await db.execute("""CREATE TABLE IF NOT EXISTS Users (
                             user_id int,
                             guild_id int,
-                            cps float,
+                            cps int,
                             coins int) STRICT""")
         await db.commit()
 

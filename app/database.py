@@ -37,17 +37,18 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    async def disable_channel(self, channel: discord.TextChannel) -> None:
+    async def disable_channel(self, guild: discord.Guild, channel_id: int) -> None:
         """Disable the game in a channel.
 
         Arguments:
         ---------
-        channel (discord.TextChannel): The channel that the game is to be disabled in
+        guild (discord.Guild): The guild that the game is to be disabled in
+        channel_id (int): The channel that the game is to be disabled in
 
         """
 
     @abstractmethod
-    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    async def get_channels(self, guild: discord.Guild) -> list[int]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
@@ -80,7 +81,7 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile | None:
+    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
@@ -109,7 +110,7 @@ class Database(AbstractDatabase):
     """Class to store user profile and channel data."""
 
     def __init__(self) -> None:
-        self.enabled: dict[discord.Guild, list[discord.TextChannel]] = collections.defaultdict(list)
+        self.enabled: dict[discord.Guild, list[int]] = collections.defaultdict(list)
         self.activeProfiles: dict[discord.Guild, dict[discord.User, UserProfile]] = collections.defaultdict(
             lambda: collections.defaultdict(UserProfile),
         )
@@ -123,20 +124,21 @@ class Database(AbstractDatabase):
 
         """
         guild = channel.guild
-        self.enabled[guild].append(channel)
+        self.enabled[guild].append(channel.id)
 
-    async def disable_channel(self, channel: discord.TextChannel) -> None:
+    async def disable_channel(self, guild: discord.Guild, channel_id: int) -> None:
         """Disable the game in a channel.
 
         Arguments:
         ---------
-        channel (discord.TextChannel): The channel that the game is to be disabled in
+        guild (discord.Guild): The guild that the game is to be disabled in
+        channel_id (int): The channel that the game is to be disabled in
 
         """
-        guild = channel.guild
-        self.enabled[guild].remove(channel)
+        # TODO: use IDs for everything in this database
+        self.enabled[guild].remove(channel_id)
 
-    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    async def get_channels(self, guild: discord.Guild) -> list[int]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
