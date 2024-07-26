@@ -3,12 +3,12 @@ import typing
 
 import aiosqlite
 import discord
-from database import UserProfile
+from database import AbstractDatabase, UserProfile
 
 db_path = "demo.db"
 
 
-class AsyncDatabase:
+class AsyncDatabase(AbstractDatabase):
     """Class to store user profile and channel data asynchronously."""
 
     def __init__(self, connection: aiosqlite.Connection) -> None:
@@ -52,29 +52,21 @@ class AsyncDatabase:
         ):
             return [discord.Client.get_channel(row[0]) for row in cursor]
 
-    async def get_active_profiles(self, guild: discord.Guild) -> list[UserProfile]:
-        """Get all the profiles that the game is enabled in.
-
-        Arguments:
-        ---------
-        guild (discord.Guild): The guild to check all enabled profiles in
-
-        """
-        async with (
-            self.connection.execute("SELECT coins, cps FROM Users WHERE guild_id = ?", (guild.id)) as cursor,
-        ):
-            return [UserProfile(coins=row[0], cps=row[1]) for row in cursor]
-
-    async def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
+    async def add_profile(
+        self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None
+    ) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
         user (discord.User): The discord user to be added
-        user_profile (UserProfile): The UserProfile data to be added
+        user_profile (UserProfile | None): The UserProfile data to be added, if None, a new instance is created
 
         """
+        if user_profile is None:
+            user_profile = UserProfile()
+
         await self.connection.execute(
             "INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?,?,?,?)",
             (user.id, guild.id, user_profile.cps, user_profile.coins),

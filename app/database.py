@@ -1,4 +1,5 @@
 import collections
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum, auto
 
@@ -22,11 +23,93 @@ class UserProfile:
     cps: float = 0.1
 
 
-class Database:
+class AbstractDatabase(ABC):
+    """An abstract database class to have database implementation."""
+
+    @abstractmethod
+    def enable_channel(self, channel: discord.TextChannel) -> None:
+        """Enable the game in a channel.
+
+        Arguments:
+        ---------
+        channel (discord.TextChannel): The channel that the game is to be enabled in
+
+        """
+
+    @abstractmethod
+    def disable_channel(self, channel: discord.TextChannel) -> None:
+        """Disable the game in a channel.
+
+        Arguments:
+        ---------
+        channel (discord.TextChannel): The channel that the game is to be disabled in
+
+        """
+
+    @abstractmethod
+    def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+        """Get all the channels that the game is in enabled in.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild to check all enabled channels in
+
+        """
+
+    @abstractmethod
+    def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
+        """Add a profile to a specific guild.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild that the user is in
+        user (discord.User): This user whose profile is to be added
+        user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
+
+        """
+
+    @abstractmethod
+    def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+        """Remove a profile from a specific guild.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild that the user is in
+        user (discord.User): This user whose profile is to be removed
+
+        """
+
+    @abstractmethod
+    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile | None:
+        """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild that will be checked
+        user (discord.User): The user whose profile that will be returned
+
+        """
+
+    @abstractmethod
+    async def update_profile(self, guild: discord.Guild, user: discord.User, new_profile: UserProfile) -> None:
+        """Replace a profile with a new profile with updated values.
+
+        Arguments:
+        ---------
+        guild (discord.Guild): The guild in which the profile is in
+        user (discord.User): The user whose profile will be updated
+        new_profile (UserProfile): The new profile with updated values that is to be inserted.
+
+        If this is not passed in a value of None is used and the profile is not changed
+
+        """
+
+
+class Database(AbstractDatabase):
     """Class to store user profile and channel data."""
 
     def __init__(self) -> None:
-        self.enabled: dict[discord.Guild, set[discord.TextChannel]] = collections.defaultdict(set)
+        self.enabled: dict[discord.Guild, list[discord.TextChannel]] = collections.defaultdict(list)
         self.activeProfiles: dict[discord.Guild, dict[discord.User, UserProfile]] = collections.defaultdict(
             lambda: collections.defaultdict(UserProfile),
         )
@@ -40,7 +123,7 @@ class Database:
 
         """
         guild = channel.guild
-        self.enabled[guild].add(channel)
+        self.enabled[guild].append(channel)
 
     def disable_channel(self, channel: discord.TextChannel) -> None:
         """Disable the game in a channel.
@@ -51,9 +134,9 @@ class Database:
 
         """
         guild = channel.guild
-        self.enabled[guild].discard(channel)
+        self.enabled[guild].remove(channel)
 
-    def get_enabled_channels(self, guild: discord.Guild) -> set[discord.TextChannel]:
+    def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
@@ -63,26 +146,20 @@ class Database:
         """
         return self.enabled[guild]
 
-    def get_active_profiles(self, guild: discord.Guild) -> dict[discord.User, UserProfile]:
-        """Get all the profiles that the game is in enabled in.
-
-        Arguments:
-        ---------
-        guild (discord.Guild): The guild to check all enabled profiles in
-
-        """
-        return self.activeProfiles[guild]
-
-    def add_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
         guild (discord.Guild): The guild that the user is in
         user (discord.User): This user whose profile is to be added
+        user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
 
         """
-        self.activeProfiles[guild][user] = UserProfile()
+        if user_profile is None:
+            user_profile = UserProfile()
+
+        self.activeProfiles[guild][user] = user_profile
 
     def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
         """Remove a profile from a specific guild.
