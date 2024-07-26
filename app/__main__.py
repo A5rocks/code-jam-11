@@ -137,7 +137,7 @@ async def send(interaction: Interaction, message: str) -> None:
         await interaction.response.send_message("Game is not enabled in this channel!")
         return
 
-    if await send_implementation(interaction.client, interaction.channel, interaction.user, message) != None:
+    if await send_implementation(interaction.client, interaction.channel, interaction.user, message) is not None:
         await interaction.response.send_message("That is too much text to send at once.", ephemeral=True)
         return
     await send_implementation(interaction.client, interaction.channel, interaction.user, message)
