@@ -77,7 +77,10 @@ class DiscordClient(discord.Client):
         await self.tree.sync()
 
         await (await self.application_info()).edit(
-            description="Enable a channel with /config enable and use /send to send messages!"
+            description=(
+                "Enable a channel with </config enable:1266082362345656333>"
+                "and use </send:1266082362345656332> to send messages!"
+            )
         )
 
 
