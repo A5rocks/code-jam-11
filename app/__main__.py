@@ -2,11 +2,61 @@ import os
 
 import discord
 import dotenv
-from database import Database
+from database import Database, MessagePriority, UserProfile
 from discord import app_commands
+from discord.ui import Button, View
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
+PRIOTIY_COST: dict[MessagePriority, int] = {MessagePriority.BOTTOM: 500, MessagePriority.MIDDLE: 2500}
+# PRIORITY_COST[current priority] -> cost to upgrade
+CPS_COST: dict[float, int] = {0.1: 1, 1: 10, 5: 25, 10: 50}
+# CPS_COST[current_cps] -> cost to upgrade
+
+
+class UpgradeView(View):
+    """A discord.View subclass to handle user interactions with the update screen."""
+
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Upgrade CPS", style=discord.ButtonStyle.blurple, custom_id="upgradepersistent:cps")
+    async def cps_upgrade(self, interaction: discord.Interaction, button: Button) -> None:
+        """Upgrade a user's CPS."""
+        button.label = "CPS Selected"
+        await interaction.response.defer()
+        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
+
+    @discord.ui.button(
+        label="Upgrade Priority",
+        style=discord.ButtonStyle.blurple,
+        custom_id="upgradepersistent:priority",
+    )
+    async def priority_upgrade(self, interaction: discord.Interaction, button: Button) -> None:
+        """Upgrade a user's priority."""
+        button.label = "Priority Selected"
+        await interaction.response.defer()
+        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
+    async def cancel(self, interaction: discord.Interaction, button: Button) -> None:
+        """Cancel the upgrade process."""
+        button.label = "Cancelled"
+        await interaction.response.defer()
+        message = await interaction.original_response()
+        await interaction.edit_original_response(embed=message.embeds[0], view=self)
+
+    async def _create_embed(self, interaction: discord.Interaction) -> discord.Embed:
+        """Create a custom embed to accompany the edited message upon upgrade."""
+        profile: UserProfile = client.database.get_profile(interaction.guild, interaction.user)
+        priority_cost = PRIOTIY_COST[profile.priority]
+        cps_cost = CPS_COST[profile.cps]
+        embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
+        embed.add_field(
+            name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
+        )
+        embed.add_field(name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}")
+        return embed
 
 
 class DiscordClient(discord.Client):
@@ -23,6 +73,7 @@ class DiscordClient(discord.Client):
 
         Right now this just synchronizes our application commands with Discord.
         """
+        self.add_view(UpgradeView())
         await self.tree.sync()
 
 
@@ -89,7 +140,11 @@ async def send(interaction: Interaction, message: str) -> None:
 @client.tree.command()
 async def upgrade(interaction: Interaction) -> None:
     """Upgrade."""
-    await interaction.response.send_message("Upgraded")
+    embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
+    embed.add_field(name="Better CPS", value="Increase the amount of characters you can send per second\nCosts [cost]")
+    embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nCosts [cost]")
+    view = UpgradeView()
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 @client.tree.command(description="Check out your stats or another user's")
