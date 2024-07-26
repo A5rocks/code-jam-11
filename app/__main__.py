@@ -5,6 +5,7 @@ import dotenv
 from database import Database, MessagePriority, UserProfile
 from discord import app_commands
 from discord.ui import Button, View
+from sender import send as send_implementation
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
@@ -124,7 +125,12 @@ async def on_message(message: discord.Message) -> None:
 @app_commands.describe(message="The message to send")
 async def send(interaction: Interaction, message: str) -> None:
     """Send a message to the current channel."""
-    await interaction.response.send_message(message)
+    if interaction.channel not in await client.database.get_channels(interaction.guild):
+        await interaction.response.send_message("Game is not enabled in this channel!")
+        return
+
+    await send_implementation(interaction.client, interaction.channel, interaction.user, message)
+    await interaction.response.send_message("Sent!", ephemeral=True)
 
 
 @client.tree.command()
