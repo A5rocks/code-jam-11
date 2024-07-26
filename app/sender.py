@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 
 MAX_MESSAGE_LENGTH = 2000
+MAX_QUEUE_TIME = 300
 
 
 class Editable(Protocol):
@@ -84,25 +85,32 @@ class Sender:
 
         self._started = False
 
-    def add_item(self, who: discord.User, cps: float, what: str) -> None:
+    def add_item(self, who: discord.User, cps: float, what: str) -> bool:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
+
+        if (len(self._buffers.get(who, "")) + len(what)) / cps > MAX_QUEUE_TIME:
+            return True
         if who in self._buffers:
             self._buffers[who] = self._buffers[who] + what
         else:
             heapq.heappush(self._queue, (loop.time() + 1 / cps, who))
             self._buffers[who] = what
+        return False
 
 
 senders: dict[discord.Channel, Sender] = collections.defaultdict(Sender)
 
 
-async def send(client: DiscordClient, where: discord.Channel, who: discord.User, what: str) -> None:
+async def send(client: DiscordClient, where: discord.Channel, who: discord.User, what: str) -> bool:
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
 
     async def cps(p: discord.User) -> float:
         profile = await client.database.get_profile(where.guild, p)
         return profile.cps
 
+    if senders[where].add_item(who, await cps(who), what) is True:
+        return True
     senders[where].add_item(who, await cps(who), what)
     asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
+    return False
