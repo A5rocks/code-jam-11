@@ -85,7 +85,7 @@ class Sender:
 
         self._started = False
 
-    def add_item(self, who: discord.User, cps: float, what: str) -> None:
+    def add_item(self, who: discord.User, cps: float, what: str) -> bool:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
 
@@ -102,7 +102,7 @@ class Sender:
 senders: dict[discord.Channel, Sender] = collections.defaultdict(Sender)
 
 
-async def send(client: DiscordClient, where: discord.Channel, who: discord.User, what: str) -> None:
+async def send(client: DiscordClient, where: discord.Channel, who: discord.User, what: str) -> bool:
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
 
     async def cps(p: discord.User) -> float:
