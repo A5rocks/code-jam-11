@@ -48,7 +48,7 @@ class UpgradeView(View):
 
     async def _create_embed(self, interaction: discord.Interaction) -> discord.Embed:
         """Create a custom embed to accompany the edited message upon upgrade."""
-        profile: UserProfile = client.database.get_profile(interaction.guild, interaction.user)
+        profile: UserProfile = await client.database.get_profile(interaction.guild, interaction.user)
         priority_cost = PRIOTIY_COST[profile.priority]
         cps_cost = CPS_COST[profile.cps]
         embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
@@ -87,26 +87,26 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def enable(self, interaction: Interaction) -> None:
         """Enable the game on the current channel."""
-        if interaction.channel in interaction.client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel in await interaction.client.database.get_channels(interaction.guild):
             await interaction.response.send_message("The game is already enabled on this channel")
         else:
-            interaction.client.database.enable_channel(interaction.channel)
+            await interaction.client.database.enable_channel(interaction.channel)
             await interaction.response.send_message("Enabled the game on this channel")
 
     @app_commands.command()
     async def disable(self, interaction: Interaction) -> None:
         """Disable the game on the current channel."""
-        if interaction.channel not in interaction.client.database.get_enabled_channels(interaction.guild):
+        if interaction.channel not in await interaction.client.database.get_channels(interaction.guild):
             await interaction.response.send_message("The game is already disabled on this channel")
         else:
-            interaction.client.database.disable_channel(interaction.channel)
+            await interaction.client.database.disable_channel(interaction.channel)
             await interaction.response.send_message("Disabled the game on this channel")
 
     @app_commands.command()
     async def reset(self, interaction: Interaction) -> None:
         """Reset access to the game for all channels."""
-        for channel in interaction.client.database.get_enabled_channels(interaction.guild):
-            interaction.client.database.disable_channel(channel)
+        for channel in await interaction.client.database.get_channels(interaction.guild):
+            await interaction.client.database.disable_channel(channel)
         await interaction.response.send_message("Resetted all channels access")
 
 
@@ -114,20 +114,10 @@ class Config(app_commands.Group):
 async def on_message(message: discord.Message) -> None:
     """Check every message to see if it should be deleted from an enabled channel."""
     if message.guild:
-        if message.author == client.user or message.channel not in client.database.get_enabled_channels(message.guild):
+        if message.author == client.user or message.channel not in await client.database.get_channels(message.guild):
             return
 
         await message.delete()
-
-
-@client.tree.command()
-@app_commands.describe(what="what to repeat")
-async def repeat(interaction: Interaction, what: str) -> None:
-    """Repeats what someone says."""
-    await interaction.response.send_message(
-        f"Repeating after you: {what}",
-        allowed_mentions=discord.AllowedMentions.none(),
-    )
 
 
 @client.tree.command()
@@ -157,7 +147,7 @@ async def profile(interaction: discord.Interaction, user: discord.Member = None)
         await interaction.response.send_message("Bots cannot play the game :(")
         return
 
-    profile = client.database.get_profile(interaction.guild, user)
+    profile = await client.database.get_profile(interaction.guild, user)
 
     embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else "" } Profile")
     embed.add_field(name="Coins", value=profile.coins)
