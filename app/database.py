@@ -27,7 +27,7 @@ class AbstractDatabase(ABC):
     """An abstract database class to have database implementation."""
 
     @abstractmethod
-    def enable_channel(self, channel: discord.TextChannel) -> None:
+    async def enable_channel(self, channel: discord.TextChannel) -> None:
         """Enable the game in a channel.
 
         Arguments:
@@ -37,7 +37,7 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    def disable_channel(self, channel: discord.TextChannel) -> None:
+    async def disable_channel(self, channel: discord.TextChannel) -> None:
         """Disable the game in a channel.
 
         Arguments:
@@ -47,7 +47,7 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
@@ -57,7 +57,7 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
+    async def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
@@ -69,7 +69,7 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
@@ -114,7 +114,7 @@ class Database(AbstractDatabase):
             lambda: collections.defaultdict(UserProfile),
         )
 
-    def enable_channel(self, channel: discord.TextChannel) -> None:
+    async def enable_channel(self, channel: discord.TextChannel) -> None:
         """Enable the game in a channel.
 
         Arguments:
@@ -125,7 +125,7 @@ class Database(AbstractDatabase):
         guild = channel.guild
         self.enabled[guild].append(channel)
 
-    def disable_channel(self, channel: discord.TextChannel) -> None:
+    async def disable_channel(self, channel: discord.TextChannel) -> None:
         """Disable the game in a channel.
 
         Arguments:
@@ -136,7 +136,7 @@ class Database(AbstractDatabase):
         guild = channel.guild
         self.enabled[guild].remove(channel)
 
-    def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
+    async def get_channels(self, guild: discord.Guild) -> list[discord.TextChannel]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
@@ -146,7 +146,9 @@ class Database(AbstractDatabase):
         """
         return self.enabled[guild]
 
-    def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None) -> None:
+    async def add_profile(
+        self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None
+    ) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
@@ -161,7 +163,7 @@ class Database(AbstractDatabase):
 
         self.activeProfiles[guild][user] = user_profile
 
-    def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
@@ -172,7 +174,7 @@ class Database(AbstractDatabase):
         """
         self.activeProfiles[guild].pop(user, None)
 
-    def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
+    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
@@ -183,7 +185,7 @@ class Database(AbstractDatabase):
         """
         return self.activeProfiles[guild][user]
 
-    def update_profile(
+    async def update_profile(
         self,
         guild: discord.Guild,
         user: discord.User,
