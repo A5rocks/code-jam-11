@@ -89,14 +89,14 @@ class Sender:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
 
-        if (len(self._buffers.get(who, "")) + len(what)) / cps > MAX_QUEUE_TIME or len(what) / cps > MAX_QUEUE_TIME:
-            return "That is too much text to send at once."
+        if (len(self._buffers.get(who, "")) + len(what)) / cps > MAX_QUEUE_TIME:
+            return True
         if who in self._buffers:
             self._buffers[who] = self._buffers[who] + what
         else:
             heapq.heappush(self._queue, (loop.time() + 1 / cps, who))
             self._buffers[who] = what
-        return None
+        return False
 
 
 senders: dict[discord.Channel, Sender] = collections.defaultdict(Sender)
@@ -109,8 +109,8 @@ async def send(client: DiscordClient, where: discord.Channel, who: discord.User,
         profile = await client.database.get_profile(where.guild, p)
         return profile.cps
 
-    if senders[where].add_item(who, await cps(who), what) is not None:
-        return "That is too much text to send at once."
+    if senders[where].add_item(who, await cps(who), what) is True:
+        return True
     senders[where].add_item(who, await cps(who), what)
     asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
-    return None
+    return False
