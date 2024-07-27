@@ -29,7 +29,6 @@ class Sender:
     _started: bool = dataclasses.field(init=False, default=False)
     _buffers: dict[int, str] = dataclasses.field(init=False, default_factory=dict)
 
-      
     async def start(self, send: Callable[[str], Awaitable[Editable]], cps: Callable[[int], Awaitable[float]]) -> None:
         """Task to send out messages slowly.
 
@@ -93,7 +92,6 @@ class Sender:
         return False
 
 
-
 senders: dict[int, Sender] = collections.defaultdict(Sender)
 
 
@@ -104,7 +102,6 @@ async def send(
     send: Callable[[str], Awaitable[Editable]],
     cps: Callable[[int], Awaitable[float]],
 ) -> bool:
-
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
     if senders[channel_id].add_item(who, await cps(who), what) is True:
         return True

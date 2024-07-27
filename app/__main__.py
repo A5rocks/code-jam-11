@@ -99,7 +99,7 @@ class UpgradeView(View):
     async def create_embed(interaction: Interaction) -> discord.Embed:
         """Create a custom embed to accompany the edited message upon upgrade."""
         profile: UserProfile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
-        priority_cost = PRIOTIY_COST[profile.priority]
+        priority_cost = PRIORITY_COST[profile.priority]
         cps_cost = get_cps_cost(profile.cps)
         embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
         if cps_cost != -1:
