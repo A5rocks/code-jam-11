@@ -1,4 +1,6 @@
 ruff
 pre-commit
 uv
+mypy
+
 -r requirements.txt

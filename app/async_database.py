@@ -2,7 +2,8 @@ import contextlib
 import typing
 
 import aiosqlite
-from database import AbstractDatabase, UserProfile
+
+from .database import AbstractDatabase, UserProfile
 
 
 class AsyncDatabase(AbstractDatabase):
