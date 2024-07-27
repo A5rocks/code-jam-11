@@ -137,7 +137,11 @@ async def send(interaction: Interaction, message: str) -> None:
         await interaction.response.send_message("Game is not enabled in this channel!")
         return
 
-    if await send_implementation(interaction.client, interaction.channel, interaction.user, message):
+    async def cps(user_id: int) -> float:
+        profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
+        return profile.cps
+
+    if await send_implementation(interaction.channel.id, interaction.user.id, message, interaction.channel.send, cps):
         await interaction.response.send_message("That is too much text to send at once.", ephemeral=True)
         return
 
