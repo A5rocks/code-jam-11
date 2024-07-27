@@ -6,12 +6,14 @@ import dataclasses
 import heapq
 from typing import TYPE_CHECKING, Protocol
 
+from app.database import UserProfile
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import discord
 
-    from __main__ import DiscordClient
+    from app.__main__ import DiscordClient
 
 
 MAX_MESSAGE_LENGTH = 2000
@@ -33,7 +35,11 @@ class Sender:
     _buffers: dict[discord.User, str] = dataclasses.field(init=False, default_factory=dict)
 
     async def start(
-        self, send: Callable[[str], Awaitable[Editable]], cps: Callable[[discord.User], Awaitable[float]]
+        self,
+        client: DiscordClient,
+        guild: discord.Guild,
+        send: Callable[[str], Awaitable[Editable]],
+        cps: Callable[[discord.User], Awaitable[float]],
     ) -> None:
         """Task to send out messages slowly.
 
@@ -75,7 +81,11 @@ class Sender:
                     last = await send(buffer)
 
             new_cps = await cps(who)
-            # TODO: add 1 coin to `who` here
+            profile = await client.database.get_profile(guild, who)
+            new_coins = profile.coins + 1
+            await client.database.update_profile(
+                guild, who, UserProfile(coins=new_coins, cps=profile.cps, priority=profile.priority)
+            )
             if len(self._buffers[who]) > 1:
                 heapq.heappush(self._queue, (when + 1 / new_cps, who))
                 self._buffers[who] = self._buffers[who][1:]
@@ -94,10 +104,10 @@ class Sender:
             self._buffers[who] = what
 
 
-senders: dict[discord.Channel, Sender] = collections.defaultdict(Sender)
+senders: dict[discord.TextChannel, Sender] = collections.defaultdict(Sender)
 
 
-async def send(client: DiscordClient, where: discord.Channel, who: discord.User, what: str) -> None:
+async def send(client: DiscordClient, where: discord.TextChannel, who: discord.User, what: str) -> None:
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
 
     async def cps(p: discord.User) -> float:
@@ -105,4 +115,4 @@ async def send(client: DiscordClient, where: discord.Channel, who: discord.User,
         return profile.cps
 
     senders[where].add_item(who, await cps(who), what)
-    asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
+    asyncio.create_task(senders[where].start(client, where.guild, where.send, cps))  # noqa: RUF006
