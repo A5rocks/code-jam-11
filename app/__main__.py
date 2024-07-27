@@ -226,7 +226,7 @@ class Config(app_commands.Group):
     async def enable(self, interaction: Interaction) -> None:
         """Enable the game on the current channel."""
         if interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
-            await interaction.response.send_message("The game is already enabled on this channel")
+            await interaction.response.send_message("The game is already enabled on this channel", ephemeral=True)
         else:
             await interaction.client.database.enable_channel(interaction.guild.id, interaction.channel.id)
             await interaction.response.send_message("Enabled the game on this channel")
@@ -277,6 +277,9 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
     """Send a user their profile's stats."""
     user = user or interaction.user
 
+    if user.bot and interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
+        await interaction.response.send_message("Bots cannot play the game :(", ephemeral=True)
+        return
     if user.bot:
         await interaction.response.send_message("Bots cannot play the game :(")
         return
@@ -288,7 +291,10 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
     embed.add_field(name="CPS", value=profile.cps)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())
 
-    await interaction.response.send_message(embed=embed)
+    if interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    else:
+        await interaction.response.send_message(embed=embed)
 
 
 config = Config(
