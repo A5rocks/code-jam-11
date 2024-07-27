@@ -1,7 +1,8 @@
 import asyncio
 import contextlib
+import math
 import os
-from enum import IntEnum
+from enum import StrEnum, auto
 
 import discord
 import dotenv
@@ -9,30 +10,37 @@ from async_database import open_database
 from database import AbstractDatabase, MessagePriority, UserProfile
 from discord import app_commands
 from discord.ui import Button, View
-
-from app.sender import send as send_implementation
+from sender import send as send_implementation
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
-PRIORITY_COST: dict[MessagePriority, int] = {MessagePriority.BOTTOM: 500, MessagePriority.MIDDLE: 2500}
+PRIORITY_COST: dict[MessagePriority, int] = {
+    MessagePriority.BOTTOM: 500,
+    MessagePriority.MIDDLE: 2500,
+    MessagePriority.TOP: -1,
+}
+CPS_PIPELINE: list[float] = [x / 10.0 for x in range(1, 20001)]
+PRIORITY_PIPELINE: list[MessagePriority] = [*list(PRIORITY_COST.keys()), MessagePriority.TOP]
+
+
 # PRIORITY_COST[current priority] -> cost to upgrade
-CPS_COST: dict[float, int] = {0.1: 1, 1: 10, 5: 25, 10: 50}
-
-
-# CPS_COST[current_cps] -> cost to upgrade
-# status codes below
-class StatusCode(IntEnum):
+class StatusCode(StrEnum):
     """Status code to determine upgrade behavior."""
 
-    SUCCESS = 30
-    NOT_ENOUGH_COINS = 33
-    NOT_ENOUGH_COINS_BEFORE_COMPLETION = 34
-    MAXIMUM_REACHED = 35
-    MAXIMUM_REACHED_BEFORE_COMPLETION = 36
+    SUCCESS = auto()
+    NOT_ENOUGH_COINS = auto()
+    NOT_ENOUGH_COINS_BEFORE_COMPLETION = auto()
+    MAXIMUM_REACHED = auto()
+    MAXIMUM_REACHED_BEFORE_COMPLETION = auto()
 
 
-CPS_PIPELINE: list[float] = [*list(CPS_COST.keys()), 2000]
-PRIORITY_PIPELINE: list[MessagePriority] = [*list(PRIORITY_COST.keys()), MessagePriority.TOP]
+def get_cps_cost(cur_cps: float) -> int:
+    """Get the cost to upgrade with the current cps."""
+    if cur_cps == CPS_PIPELINE[-1]:
+        return -1
+    cost = cur_cps * (1.5 ** (cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
+    return round(cost)
+
 
 type Interaction = discord.Interaction[DiscordClient]
 
@@ -90,33 +98,44 @@ class UpgradeView(View):
     @staticmethod
     async def create_embed(interaction: Interaction) -> discord.Embed:
         """Create a custom embed to accompany the edited message upon upgrade."""
-        profile: UserProfile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
-        priority_cost: int = PRIORITY_COST[profile.priority]
-        cps_cost: int = CPS_COST[profile.cps]
+        profile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
+        priority_cost = PRIORITY_COST[profile.priority]
+        cps_cost = get_cps_cost(profile.cps)
         embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
-        embed.add_field(
-            name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
-        )
-        embed.add_field(name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}")
+        if cps_cost != -1:
+            embed.add_field(
+                name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
+            )
+        else:
+            embed.add_field(
+                name="Better CPS", value="Increase the amount of characters you can send per second\nMAXED OUT"
+            )
+        if priority_cost != -1:
+            embed.add_field(
+                name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}"
+            )
+        else:
+            embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nMAXED OUT")
+
         return embed
 
     async def _upgrade_priority(self, interaction: Interaction) -> tuple[UserProfile, StatusCode]:
         """Upgrade the priority of the user."""
-        profile: UserProfile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
-        priority_cost: int = PRIORITY_COST[profile.priority]
+        profile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
+        priority_cost = PRIORITY_COST[profile.priority]
         if profile.coins < priority_cost:
             return (profile, StatusCode.NOT_ENOUGH_COINS)
         if profile.priority == MessagePriority.TOP:
             return (profile, StatusCode.MAXIMUM_REACHED)
-        new_coins: int = profile.coins - priority_cost
-        new_priority: MessagePriority = PRIORITY_PIPELINE[PRIORITY_PIPELINE.index(profile.priority) + 1]
-        new_profile: UserProfile = UserProfile(coins=new_coins, priority=new_priority)
+        new_coins = profile.coins - priority_cost
+        new_priority = PRIORITY_PIPELINE[PRIORITY_PIPELINE.index(profile.priority) + 1]
+        new_profile = UserProfile(coins=new_coins, priority=new_priority)
         return (new_profile, StatusCode.SUCCESS)
 
     async def _upgrade_cps(self, interaction: Interaction, iterations: int = 1) -> tuple[UserProfile, StatusCode]:
         """Upgrade the cps of the user."""
-        profile: UserProfile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
-        cps_cost: int = CPS_COST[profile.cps]
+        profile = await interaction.client.database.get_profile(interaction.guild, interaction.user)
+        cps_cost = get_cps_cost(profile.cps)
         reloop = False
         new_coins = profile.coins
         new_cps = profile.cps
@@ -131,7 +150,7 @@ class UpgradeView(View):
                     UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority),
                     StatusCode.NOT_ENOUGH_COINS_BEFORE_COMPLETION,
                 )
-            if profile.cps == CPS_PIPELINE[-1] and not reloop:  # replace with number that should be the maximum
+            if profile.cps == CPS_PIPELINE[-1] and not reloop:
                 return profile, StatusCode.MAXIMUM_REACHED
             if profile.cps == CPS_PIPELINE[-1] and reloop:
                 await interaction.followup.send(
@@ -144,7 +163,7 @@ class UpgradeView(View):
 
             new_coins = new_coins - cps_cost
             new_cps = CPS_PIPELINE[CPS_PIPELINE.index(profile.cps) + 1]
-            cps_cost: int = CPS_COST[new_cps]
+            cps_cost = get_cps_cost(profile.cps)
             reloop = True
 
         return UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority), StatusCode.SUCCESS
@@ -257,7 +276,7 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
 
     profile = await interaction.client.database.get_profile(interaction.guild, user)
 
-    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else "" } Profile")
+    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else ""} Profile")
     embed.add_field(name="Coins", value=profile.coins)
     embed.add_field(name="CPS", value=profile.cps)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())

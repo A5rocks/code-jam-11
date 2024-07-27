@@ -6,14 +6,12 @@ import dataclasses
 import heapq
 from typing import TYPE_CHECKING, Protocol
 
-from app.database import UserProfile
-
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     import discord
 
-    from app.__main__ import DiscordClient
+    from __main__ import DiscordClient
 
 
 MAX_MESSAGE_LENGTH = 2000
@@ -36,8 +34,6 @@ class Sender:
 
     async def start(
         self,
-        client: DiscordClient,
-        guild: discord.Guild,
         send: Callable[[str], Awaitable[Editable]],
         cps: Callable[[discord.User], Awaitable[float]],
     ) -> None:
@@ -81,11 +77,6 @@ class Sender:
                     last = await send(buffer)
 
             new_cps = await cps(who)
-            profile = await client.database.get_profile(guild, who)
-            new_coins = profile.coins + 1
-            await client.database.update_profile(
-                guild, who, UserProfile(coins=new_coins, cps=profile.cps, priority=profile.priority)
-            )
             if len(self._buffers[who]) > 1:
                 heapq.heappush(self._queue, (when + 1 / new_cps, who))
                 self._buffers[who] = self._buffers[who][1:]
@@ -115,4 +106,4 @@ async def send(client: DiscordClient, where: discord.TextChannel, who: discord.U
         return profile.cps
 
     senders[where].add_item(who, await cps(who), what)
-    asyncio.create_task(senders[where].start(client, where.guild, where.send, cps))  # noqa: RUF006
+    asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
