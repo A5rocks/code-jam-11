@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum, auto
 
-import discord
-
 
 class MessagePriority(StrEnum):
     """Enum to determine a user's priority."""
@@ -27,78 +25,79 @@ class AbstractDatabase(ABC):
     """An abstract database class to have database implementation."""
 
     @abstractmethod
-    async def enable_channel(self, channel: discord.TextChannel) -> None:
+    async def enable_channel(self, guild_id: int, channel_id: int) -> None:
         """Enable the game in a channel.
 
         Arguments:
         ---------
-        channel (discord.TextChannel): The channel that the game is to be enabled in
+        guild_id (int): The guild that the game is to be enabled in
+        channel_id (int): The channel that the game is to be enabled in
 
         """
 
     @abstractmethod
-    async def disable_channel(self, guild: discord.Guild, channel_id: int) -> None:
+    async def disable_channel(self, guild_id: int, channel_id: int) -> None:
         """Disable the game in a channel.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the game is to be disabled in
+        guild_id (int): The guild that the game is to be disabled in
         channel_id (int): The channel that the game is to be disabled in
 
         """
 
     @abstractmethod
-    async def get_channels(self, guild: discord.Guild) -> list[int]:
+    async def get_channels(self, guild_id: int) -> list[int]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild to check all enabled channels in
+        guild_id (int): The guild to get all enabled channels in
 
         """
 
     @abstractmethod
-    async def add_profile(self, guild: discord.Guild, user: discord.User, user_profile: UserProfile) -> None:
+    async def add_profile(self, guild_id: int, user_id: int, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be added
+        guild_id (int): The guild that the user is in
+        user_id (int): This user whose profile is to be added
         user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
 
         """
 
     @abstractmethod
-    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    async def remove_profile(self, guild_id: int, user_id: int) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be removed
+        guild_id (int): The guild that the user is in
+        user_id (int): This user whose profile is to be removed
 
         """
 
     @abstractmethod
-    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
+    async def get_profile(self, guild_id: int, user_id: int) -> UserProfile:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that will be checked
-        user (discord.User): The user whose profile that will be returned
+        guild_id (int): The guild that will be checked
+        user_id (int): The user whose profile that will be returned
 
         """
 
     @abstractmethod
-    async def update_profile(self, guild: discord.Guild, user: discord.User, new_profile: UserProfile) -> None:
+    async def update_profile(self, guild_id: int, user_id: int, new_profile: UserProfile) -> None:
         """Replace a profile with a new profile with updated values.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild in which the profile is in
-        user (discord.User): The user whose profile will be updated
+        guild_id (int): The guild in which the profile is in
+        user_id (int): The user whose profile will be updated
         new_profile (UserProfile): The new profile with updated values that is to be inserted.
 
         If this is not passed in a value of None is used and the profile is not changed
@@ -110,98 +109,90 @@ class Database(AbstractDatabase):
     """Class to store user profile and channel data."""
 
     def __init__(self) -> None:
-        self.enabled: dict[discord.Guild, list[int]] = collections.defaultdict(list)
-        self.activeProfiles: dict[discord.Guild, dict[discord.User, UserProfile]] = collections.defaultdict(
+        self.enabled: dict[int, list[int]] = collections.defaultdict(list)
+        self.activeProfiles: dict[int, dict[int, UserProfile]] = collections.defaultdict(
             lambda: collections.defaultdict(UserProfile),
         )
 
-    async def enable_channel(self, channel: discord.TextChannel) -> None:
+    async def enable_channel(self, guild_id: int, channel_id: int) -> None:
         """Enable the game in a channel.
 
         Arguments:
         ---------
-        channel (discord.TextChannel): The channel that the game is to be enabled in
+        guild_id (int): The guild that the game is to be enabled in
+        channel_id (int): The channel that the game is to be enabled in
 
         """
-        guild = channel.guild
-        self.enabled[guild].append(channel.id)
+        self.enabled[guild_id].append(channel_id)
 
-    async def disable_channel(self, guild: discord.Guild, channel_id: int) -> None:
+    async def disable_channel(self, guild_id: int, channel_id: int) -> None:
         """Disable the game in a channel.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the game is to be disabled in
+        guild_id (int): The guild that the game is to be disabled in
         channel_id (int): The channel that the game is to be disabled in
 
         """
-        # TODO: use IDs for everything in this database
-        self.enabled[guild].remove(channel_id)
+        self.enabled[guild_id].remove(channel_id)
 
-    async def get_channels(self, guild: discord.Guild) -> list[int]:
+    async def get_channels(self, guild_id: int) -> list[int]:
         """Get all the channels that the game is in enabled in.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild to check all enabled channels in
+        guild_id (int): The guild to get all enabled channels in
 
         """
-        return self.enabled[guild]
+        return self.enabled[guild_id]
 
-    async def add_profile(
-        self, guild: discord.Guild, user: discord.User, user_profile: UserProfile | None = None
-    ) -> None:
+    async def add_profile(self, guild_id: int, user_id: int, user_profile: UserProfile) -> None:
         """Add a profile to a specific guild.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be added
+        guild_id (int): The guild that the user is in
+        user_id (int): This user whose profile is to be added
         user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
 
         """
         if user_profile is None:
             user_profile = UserProfile()
 
-        self.activeProfiles[guild][user] = user_profile
+        self.activeProfiles[guild_id][user_id] = user_profile
 
-    async def remove_profile(self, guild: discord.Guild, user: discord.User) -> None:
+    async def remove_profile(self, guild_id: int, user_id: int) -> None:
         """Remove a profile from a specific guild.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that the user is in
-        user (discord.User): This user whose profile is to be removed
+        guild_id (int): The guild that the user is in
+        user_id (int): This user whose profile is to be removed
 
         """
-        self.activeProfiles[guild].pop(user, None)
+        self.activeProfiles[guild_id].pop(user_id, None)
 
-    async def get_profile(self, guild: discord.Guild, user: discord.User) -> UserProfile:
+    async def get_profile(self, guild_id: int, user_id: int) -> UserProfile:
         """Get a profile from a specific guild, if the user object does not have the guild already attached to it.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild that will be checked
-        user (discord.User): The user whose profile that will be returned
+        guild_id (int): The guild that will be checked
+        user_id (int): The user whose profile that will be returned
 
         """
-        return self.activeProfiles[guild][user]
+        return self.activeProfiles[guild_id][user_id]
 
-    async def update_profile(
-        self,
-        guild: discord.Guild,
-        user: discord.User,
-        new_profile: UserProfile,
-    ) -> None:
+    async def update_profile(self, guild_id: int, user_id: int, new_profile: UserProfile) -> None:
         """Replace a profile with a new profile with updated values.
 
         Arguments:
         ---------
-        guild (discord.Guild): The guild in which the profile is in
-        user (discord.User): The user whose profile will be updated
+        guild_id (int): The guild in which the profile is in
+        user_id (int): The user whose profile will be updated
         new_profile (UserProfile): The new profile with updated values that is to be inserted.
 
         If this is not passed in a value of None is used and the profile is not changed
 
         """
-        self.activeProfiles[guild][user] = new_profile
+        self.activeProfiles[guild_id][user_id] = new_profile
