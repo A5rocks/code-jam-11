@@ -280,7 +280,7 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
     if user.bot and interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
         await interaction.response.send_message("Bots cannot play the game :(", ephemeral=True)
         return
-    elif user.bot:
+    if user.bot:
         await interaction.response.send_message("Bots cannot play the game :(")
         return
 
@@ -295,6 +295,7 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message(embed=embed)
+
 
 config = Config(
     name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
