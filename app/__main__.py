@@ -229,7 +229,7 @@ class Config(app_commands.Group):
             await interaction.response.send_message("The game is already enabled on this channel", ephemeral=True)
         else:
             await interaction.client.database.enable_channel(interaction.guild.id, interaction.channel.id)
-            await interaction.response.send_message("Enabled the game on this channel", ephemeral=True)
+            await interaction.response.send_message("Enabled the game on this channel")
 
     @app_commands.command()
     async def disable(self, interaction: Interaction) -> None:
@@ -245,7 +245,7 @@ class Config(app_commands.Group):
         """Reset access to the game for all channels."""
         for channel_id in await interaction.client.database.get_channels(interaction.guild.id):
             await interaction.client.database.disable_channel(interaction.guild.id, channel_id)
-        await interaction.response.send_message("Resetted all channels access", ephemeral=True)
+        await interaction.response.send_message("Resetted all channels access")
 
 
 @app_commands.describe(message="The message to send")
@@ -277,7 +277,10 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
     """Send a user their profile's stats."""
     user = user or interaction.user
 
-    if user.bot:
+    if user.bot and interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
+        await interaction.response.send_message("Bots cannot play the game :(", ephemeral=True)
+        return
+    elif user.bot:
         await interaction.response.send_message("Bots cannot play the game :(")
         return
 
@@ -288,8 +291,10 @@ async def profile(interaction: Interaction, user: discord.Member = None) -> None
     embed.add_field(name="CPS", value=profile.cps)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())
 
-    await interaction.response.send_message(embed=embed)
-
+    if interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    else:
+        await interaction.response.send_message(embed=embed)
 
 config = Config(
     name="config", description="Configures the game", default_permissions=discord.Permissions(manage_guild=True)
