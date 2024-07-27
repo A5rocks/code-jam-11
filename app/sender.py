@@ -70,7 +70,6 @@ class Sender:
                     last = await send(buffer)
 
             new_cps = await cps(who)
-            # TODO: add 1 coin to `who` here
             if len(self._buffers[who]) > 1:
                 heapq.heappush(self._queue, (when + 1 / new_cps, who))
                 self._buffers[who] = self._buffers[who][1:]

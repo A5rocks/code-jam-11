@@ -1,6 +1,8 @@
 import asyncio
 import contextlib
+import math
 import os
+from enum import Enum, auto
 
 import discord
 import dotenv
@@ -12,10 +14,33 @@ from sender import send as send_implementation
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
-PRIOTIY_COST: dict[MessagePriority, int] = {MessagePriority.BOTTOM: 500, MessagePriority.MIDDLE: 2500}
+PRIORITY_COST: dict[MessagePriority, int] = {
+    MessagePriority.BOTTOM: 500,
+    MessagePriority.MIDDLE: 2500,
+    MessagePriority.TOP: -1,
+}
+MAXIMUM_CPS = 2000.0
+PRIORITY_PIPELINE: list[MessagePriority] = list(PRIORITY_COST.keys())
+
+
 # PRIORITY_COST[current priority] -> cost to upgrade
-CPS_COST: dict[float, int] = {0.1: 1, 1: 10, 5: 25, 10: 50}
-# CPS_COST[current_cps] -> cost to upgrade
+class StatusCode(Enum):
+    """Status code to determine upgrade behavior."""
+
+    SUCCESS = auto()
+    NOT_ENOUGH_COINS = auto()
+    NOT_ENOUGH_COINS_BEFORE_COMPLETION = auto()
+    MAXIMUM_REACHED = auto()
+    MAXIMUM_REACHED_BEFORE_COMPLETION = auto()
+
+
+def get_cps_cost(cur_cps: float) -> int:
+    """Get the cost to upgrade with the current cps."""
+    if cur_cps == MAXIMUM_CPS:
+        return -1
+    cost = cur_cps * (1.5 ** (cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
+    return round(cost)
+
 
 type Interaction = discord.Interaction[DiscordClient]
 
@@ -31,7 +56,10 @@ class UpgradeView(View):
         """Upgrade a user's CPS."""
         button.label = "CPS Selected"
         await interaction.response.defer()
-        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
+        new_profile, status_code = await self._upgrade_cps(interaction)
+        await self._handle_status_code(interaction, status_code)
+        await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
+        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
 
     @discord.ui.button(
         label="Upgrade Priority",
@@ -42,7 +70,10 @@ class UpgradeView(View):
         """Upgrade a user's priority."""
         button.label = "Priority Selected"
         await interaction.response.defer()
-        await interaction.edit_original_response(embed=await self._create_embed(interaction), view=self)
+        new_profile, status_code = await self._upgrade_priority(interaction)
+        await self._handle_status_code(interaction, status_code)
+        await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
+        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
     async def cancel(self, interaction: Interaction, button: Button) -> None:
@@ -52,17 +83,104 @@ class UpgradeView(View):
         message = await interaction.original_response()
         await interaction.edit_original_response(embed=message.embeds[0], view=self)
 
-    async def _create_embed(self, interaction: Interaction) -> discord.Embed:
+    @discord.ui.button(
+        label="CPS Upgrade 10x", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:cps10x"
+    )
+    async def cps_upgrade_ten(self, interaction: Interaction, button: Button) -> None:
+        """Upgrade CPS ten times."""
+        button.label = "CPS 10x Selected"
+        await interaction.response.defer()
+        new_profile, status_code = await self._upgrade_cps(interaction, 10)
+        await self._handle_status_code(interaction, status_code)
+        await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
+        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
+
+    @staticmethod
+    async def create_embed(interaction: Interaction) -> discord.Embed:
         """Create a custom embed to accompany the edited message upon upgrade."""
         profile: UserProfile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
-        priority_cost = PRIOTIY_COST[profile.priority]
-        cps_cost = CPS_COST[profile.cps]
+        priority_cost = PRIORITY_COST[profile.priority]
+        cps_cost = get_cps_cost(profile.cps)
         embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
-        embed.add_field(
-            name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
-        )
-        embed.add_field(name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}")
+        if cps_cost != -1:
+            embed.add_field(
+                name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
+            )
+        else:
+            embed.add_field(
+                name="Better CPS", value="Increase the amount of characters you can send per second\nMAXED OUT"
+            )
+        if priority_cost != -1:
+            embed.add_field(
+                name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}"
+            )
+        else:
+            embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nMAXED OUT")
+
         return embed
+
+    async def _upgrade_priority(self, interaction: Interaction) -> tuple[UserProfile, StatusCode]:
+        """Upgrade the priority of the user."""
+        profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
+        priority_cost = PRIORITY_COST[profile.priority]
+        if profile.coins < priority_cost:
+            return (profile, StatusCode.NOT_ENOUGH_COINS)
+        if profile.priority == MessagePriority.TOP:
+            return (profile, StatusCode.MAXIMUM_REACHED)
+        new_coins = profile.coins - priority_cost
+        new_priority = PRIORITY_PIPELINE[PRIORITY_PIPELINE.index(profile.priority) + 1]
+        new_profile = UserProfile(coins=new_coins, priority=new_priority)
+        return (new_profile, StatusCode.SUCCESS)
+
+    async def _upgrade_cps(self, interaction: Interaction, iterations: int = 1) -> tuple[UserProfile, StatusCode]:
+        """Upgrade the cps of the user."""
+        profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
+        cps_cost = get_cps_cost(profile.cps)
+        reloop = False
+        new_coins = profile.coins
+        new_cps = profile.cps
+        for var in range(iterations):
+            if profile.coins < cps_cost and not reloop:
+                return profile, StatusCode.NOT_ENOUGH_COINS
+            if profile.coins < cps_cost and reloop:
+                await interaction.followup.send(
+                    f"Upgraded {var + 1} times before running out of coins.", ephemeral=True
+                )
+                return (
+                    UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority),
+                    StatusCode.NOT_ENOUGH_COINS_BEFORE_COMPLETION,
+                )
+            if profile.cps == MAXIMUM_CPS and not reloop:
+                return profile, StatusCode.MAXIMUM_REACHED
+            if profile.cps == MAXIMUM_CPS and reloop:
+                await interaction.followup.send(
+                    f"Upgraded {var + 1} times before reaching maximum upgrade", ephemeral=True
+                )
+                return (
+                    UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority),
+                    StatusCode.MAXIMUM_REACHED_BEFORE_COMPLETION,
+                )
+
+            new_coins = new_coins - cps_cost
+            new_cps = new_cps + 0.1
+            cps_cost = get_cps_cost(profile.cps)
+            reloop = True
+
+        return UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority), StatusCode.SUCCESS
+
+    async def _handle_status_code(self, interaction: Interaction, status_code: StatusCode) -> None:
+        """Send an ephemeral message to the user upon completion of an upgrade, depending on status_code.
+
+        Two of the status codes are handled by _upgrade_cps
+        """
+        if status_code == StatusCode.NOT_ENOUGH_COINS:
+            await interaction.followup.send(
+                "You do not have enough coins to proceed with this upgrade", ephemeral=True
+            )
+        elif status_code == StatusCode.MAXIMUM_REACHED:
+            await interaction.followup.send("You already have the maximum upgrade for this category", ephemeral=True)
+        elif status_code == StatusCode.SUCCESS:
+            await interaction.followup.send("Your upgrade was successful!", ephemeral=True)
 
 
 class DiscordClient(discord.Client):
@@ -150,15 +268,12 @@ async def send(interaction: Interaction, message: str) -> None:
 
 async def upgrade(interaction: Interaction) -> None:
     """Upgrade."""
-    embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
-    embed.add_field(name="Better CPS", value="Increase the amount of characters you can send per second\nCosts [cost]")
-    embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nCosts [cost]")
     view = UpgradeView()
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    await interaction.response.send_message(embed=await view.create_embed(interaction), view=view, ephemeral=True)
 
 
 @app_commands.describe(user="The user to check the stats of. Defaults to you")
-async def profile(interaction: discord.Interaction, user: discord.Member = None) -> None:
+async def profile(interaction: Interaction, user: discord.Member = None) -> None:
     """Send a user their profile's stats."""
     user = user or interaction.user
 
@@ -168,7 +283,7 @@ async def profile(interaction: discord.Interaction, user: discord.Member = None)
 
     profile = await interaction.client.database.get_profile(interaction.guild.id, user.id)
 
-    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else "" } Profile")
+    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else ""} Profile")
     embed.add_field(name="Coins", value=profile.coins)
     embed.add_field(name="CPS", value=profile.cps)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())
