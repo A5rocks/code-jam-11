@@ -106,6 +106,6 @@ async def send(
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
     if senders[channel_id].add_item(who, await cps(who), what) is True:
         return True
-    senders[channel_id].add_item(who, await cps(who), what)
+
     asyncio.create_task(senders[channel_id].start(send, cps))  # noqa: RUF006
     return False
