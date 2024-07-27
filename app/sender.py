@@ -9,12 +9,9 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    import discord
-
-    from __main__ import DiscordClient
-
 
 MAX_MESSAGE_LENGTH = 2000
+MAX_QUEUE_TIME = 300
 
 
 class Editable(Protocol):
@@ -28,15 +25,12 @@ class Editable(Protocol):
 class Sender:
     """Storage for messages that are to be sent out slowly."""
 
-    _queue: list[tuple[float, discord.User]] = dataclasses.field(init=False, default_factory=list)
+    _queue: list[tuple[float, int]] = dataclasses.field(init=False, default_factory=list)
     _started: bool = dataclasses.field(init=False, default=False)
-    _buffers: dict[discord.User, str] = dataclasses.field(init=False, default_factory=dict)
+    _buffers: dict[int, str] = dataclasses.field(init=False, default_factory=dict)
 
-    async def start(
-        self,
-        send: Callable[[str], Awaitable[Editable]],
-        cps: Callable[[discord.User], Awaitable[float]],
-    ) -> None:
+      
+    async def start(self, send: Callable[[str], Awaitable[Editable]], cps: Callable[[int], Awaitable[float]]) -> None:
         """Task to send out messages slowly.
 
         It is ok to start this task multiple times, though not across multiple threads.
@@ -85,25 +79,35 @@ class Sender:
 
         self._started = False
 
-    def add_item(self, who: discord.User, cps: float, what: str) -> None:
+    def add_item(self, who: int, cps: float, what: str) -> bool:
         """Add a message to a queue to be sent."""
         loop = asyncio.get_running_loop()
+
+        if (len(self._buffers.get(who, "")) + len(what)) / cps > MAX_QUEUE_TIME:
+            return True
         if who in self._buffers:
             self._buffers[who] = self._buffers[who] + what
         else:
             heapq.heappush(self._queue, (loop.time() + 1 / cps, who))
             self._buffers[who] = what
+        return False
 
 
-senders: dict[discord.TextChannel, Sender] = collections.defaultdict(Sender)
+
+senders: dict[int, Sender] = collections.defaultdict(Sender)
 
 
-async def send(client: DiscordClient, where: discord.TextChannel, who: discord.User, what: str) -> None:
+async def send(
+    channel_id: int,
+    who: int,
+    what: str,
+    send: Callable[[str], Awaitable[Editable]],
+    cps: Callable[[int], Awaitable[float]],
+) -> bool:
+
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
+    if senders[channel_id].add_item(who, await cps(who), what) is True:
+        return True
 
-    async def cps(p: discord.User) -> float:
-        profile = await client.database.get_profile(where.guild, p)
-        return profile.cps
-
-    senders[where].add_item(who, await cps(who), what)
-    asyncio.create_task(senders[where].start(where.send, cps))  # noqa: RUF006
+    asyncio.create_task(senders[channel_id].start(send, cps))  # noqa: RUF006
+    return False

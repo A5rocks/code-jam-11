@@ -15,6 +15,7 @@ RUN adduser \
     --no-create-home \
     --uid "${UID}" \
     appuser
+RUN chown appuser /app
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
