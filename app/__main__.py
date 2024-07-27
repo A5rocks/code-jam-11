@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import math
 import os
-from enum import StrEnum, auto
+from enum import Enum, auto
 
 import discord
 import dotenv
@@ -19,12 +19,12 @@ PRIORITY_COST: dict[MessagePriority, int] = {
     MessagePriority.MIDDLE: 2500,
     MessagePriority.TOP: -1,
 }
-CPS_PIPELINE: list[float] = [x / 10.0 for x in range(1, 20001)]
-PRIORITY_PIPELINE: list[MessagePriority] = [*list(PRIORITY_COST.keys()), MessagePriority.TOP]
+MAXIMUM_CPS = 2000.0
+PRIORITY_PIPELINE: list[MessagePriority] = list(PRIORITY_COST.keys())
 
 
 # PRIORITY_COST[current priority] -> cost to upgrade
-class StatusCode(StrEnum):
+class StatusCode(Enum):
     """Status code to determine upgrade behavior."""
 
     SUCCESS = auto()
@@ -36,7 +36,7 @@ class StatusCode(StrEnum):
 
 def get_cps_cost(cur_cps: float) -> int:
     """Get the cost to upgrade with the current cps."""
-    if cur_cps == CPS_PIPELINE[-1]:
+    if cur_cps == MAXIMUM_CPS:
         return -1
     cost = cur_cps * (1.5 ** (cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
     return round(cost)
@@ -150,9 +150,9 @@ class UpgradeView(View):
                     UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority),
                     StatusCode.NOT_ENOUGH_COINS_BEFORE_COMPLETION,
                 )
-            if profile.cps == CPS_PIPELINE[-1] and not reloop:
+            if profile.cps == MAXIMUM_CPS and not reloop:
                 return profile, StatusCode.MAXIMUM_REACHED
-            if profile.cps == CPS_PIPELINE[-1] and reloop:
+            if profile.cps == MAXIMUM_CPS and reloop:
                 await interaction.followup.send(
                     f"Upgraded {var + 1} times before reaching maximum upgrade", ephemeral=True
                 )
@@ -162,7 +162,7 @@ class UpgradeView(View):
                 )
 
             new_coins = new_coins - cps_cost
-            new_cps = CPS_PIPELINE[CPS_PIPELINE.index(profile.cps) + 1]
+            new_cps = new_cps + 0.1
             cps_cost = get_cps_cost(profile.cps)
             reloop = True
 
