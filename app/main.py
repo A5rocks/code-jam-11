@@ -52,13 +52,12 @@ class UpgradeView(View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Upgrade CPS", style=discord.ButtonStyle.blurple, custom_id="upgradepersistent:cps")
-    async def cps_upgrade(self, interaction: Interaction, button: Button[typing.Self]) -> None:
+    async def cps_upgrade(self, interaction: Interaction, _: Button[typing.Self]) -> None:
         """Upgrade a user's CPS."""
         if not interaction.guild:
             await interaction.response.send_message("This needs to be used in a guild")
             return
 
-        button.label = "CPS Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_cps(interaction)
         await self._handle_status_code(interaction, status_code)
@@ -70,37 +69,27 @@ class UpgradeView(View):
         style=discord.ButtonStyle.blurple,
         custom_id="upgradepersistent:priority",
     )
-    async def priority_upgrade(self, interaction: Interaction, button: Button[typing.Self]) -> None:
+    async def priority_upgrade(self, interaction: Interaction, _: Button[typing.Self]) -> None:
         """Upgrade a user's priority."""
         if not interaction.guild:
             await interaction.response.send_message("This needs to be used in a guild")
             return
 
-        button.label = "Priority Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_priority(interaction)
         await self._handle_status_code(interaction, status_code)
         await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
         await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
-    async def cancel(self, interaction: Interaction, button: Button[typing.Self]) -> None:
-        """Cancel the upgrade process."""
-        button.label = "Cancelled"
-        await interaction.response.defer()
-        message = await interaction.original_response()
-        await interaction.edit_original_response(embed=message.embeds[0], view=self)
-
     @discord.ui.button(
         label="CPS Upgrade 10x", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:cps10x"
     )
-    async def cps_upgrade_ten(self, interaction: Interaction, button: Button[typing.Self]) -> None:
+    async def cps_upgrade_ten(self, interaction: Interaction, _: Button[typing.Self]) -> None:
         """Upgrade CPS ten times."""
         if not interaction.guild:
             await interaction.response.send_message("This needs to be used in a guild")
             return
 
-        button.label = "CPS 10x Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_cps(interaction, 10)
         await self._handle_status_code(interaction, status_code)
@@ -296,8 +285,6 @@ async def send(interaction: Interaction, message: str) -> None:
         await interaction.response.send_message("Game is not enabled in this channel!")
         return
 
-    await interaction.client.database.add_profile(interaction.guild.id, interaction.user.id, UserProfile())
-
     async def cps(user_id: int) -> float:
         if not interaction.guild:
             raise AssertionError
@@ -311,7 +298,9 @@ async def send(interaction: Interaction, message: str) -> None:
 
         profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
         await interaction.client.database.update_profile(
-            interaction.guild.id, user_id, UserProfile(priority=profile.priority, coins=profile.coins + 1)
+            interaction.guild.id,
+            user_id,
+            UserProfile(priority=profile.priority, coins=profile.coins + 1, cps=profile.cps),
         )
 
     if await send_implementation(
