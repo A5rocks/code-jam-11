@@ -3,9 +3,8 @@
 # The original reason for this limit was a standard vim terminal is only 79 characters,
 # but this doesn't really apply anymore.
 line-length = 119
-# Target Python 3.12. If you decide to use a different version of Python
-# you will need to update this value.
-target-version = "py312"
+# This is 3.11 so that we don't get new type syntax (which mypy doesn't support)
+target-version = "py311"
 # Automatically fix auto-fixable issues.
 fix = true
 # The directory containing the source code. If you choose a different project layout
@@ -45,3 +44,7 @@ ignore = [
     "COM812",
     "ISC001",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

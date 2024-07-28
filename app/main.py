@@ -1,16 +1,16 @@
-import asyncio
-import contextlib
 import math
 import os
+import typing
 from enum import Enum, auto
 
 import discord
 import dotenv
-from async_database import open_database
-from database import AbstractDatabase, MessagePriority, UserProfile
 from discord import app_commands
 from discord.ui import Button, View
-from sender import send as send_implementation
+
+from .async_database import open_database
+from .database import AbstractDatabase, MessagePriority, UserProfile
+from .sender import send as send_implementation
 
 dotenv.load_dotenv()
 TOKEN = os.environ["TOKEN"]
@@ -38,11 +38,11 @@ def get_cps_cost(cur_cps: float) -> int:
     """Get the cost to upgrade with the current cps."""
     if cur_cps == MAXIMUM_CPS:
         return -1
-    cost = cur_cps * (1.5 ** (cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
+    cost = cur_cps * (math.pow(1.5, cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
     return round(cost)
 
 
-type Interaction = discord.Interaction[DiscordClient]
+Interaction: typing.TypeAlias = "discord.Interaction[DiscordClient]"
 
 
 class UpgradeView(View):
@@ -52,8 +52,12 @@ class UpgradeView(View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Upgrade CPS", style=discord.ButtonStyle.blurple, custom_id="upgradepersistent:cps")
-    async def cps_upgrade(self, interaction: Interaction, button: Button) -> None:
+    async def cps_upgrade(self, interaction: Interaction, button: Button[typing.Self]) -> None:
         """Upgrade a user's CPS."""
+        if not interaction.guild:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         button.label = "CPS Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_cps(interaction)
@@ -66,8 +70,12 @@ class UpgradeView(View):
         style=discord.ButtonStyle.blurple,
         custom_id="upgradepersistent:priority",
     )
-    async def priority_upgrade(self, interaction: Interaction, button: Button) -> None:
+    async def priority_upgrade(self, interaction: Interaction, button: Button[typing.Self]) -> None:
         """Upgrade a user's priority."""
+        if not interaction.guild:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         button.label = "Priority Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_priority(interaction)
@@ -76,7 +84,7 @@ class UpgradeView(View):
         await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="upgradepersistent:cancel")
-    async def cancel(self, interaction: Interaction, button: Button) -> None:
+    async def cancel(self, interaction: Interaction, button: Button[typing.Self]) -> None:
         """Cancel the upgrade process."""
         button.label = "Cancelled"
         await interaction.response.defer()
@@ -86,8 +94,12 @@ class UpgradeView(View):
     @discord.ui.button(
         label="CPS Upgrade 10x", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:cps10x"
     )
-    async def cps_upgrade_ten(self, interaction: Interaction, button: Button) -> None:
+    async def cps_upgrade_ten(self, interaction: Interaction, button: Button[typing.Self]) -> None:
         """Upgrade CPS ten times."""
+        if not interaction.guild:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         button.label = "CPS 10x Selected"
         await interaction.response.defer()
         new_profile, status_code = await self._upgrade_cps(interaction, 10)
@@ -98,6 +110,9 @@ class UpgradeView(View):
     @staticmethod
     async def create_embed(interaction: Interaction) -> discord.Embed:
         """Create a custom embed to accompany the edited message upon upgrade."""
+        if not interaction.guild:
+            raise AssertionError
+
         profile: UserProfile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
         priority_cost = PRIORITY_COST[profile.priority]
         cps_cost = get_cps_cost(profile.cps)
@@ -121,6 +136,9 @@ class UpgradeView(View):
 
     async def _upgrade_priority(self, interaction: Interaction) -> tuple[UserProfile, StatusCode]:
         """Upgrade the priority of the user."""
+        if not interaction.guild:
+            raise AssertionError
+
         profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
         priority_cost = PRIORITY_COST[profile.priority]
         if profile.coins < priority_cost:
@@ -134,6 +152,9 @@ class UpgradeView(View):
 
     async def _upgrade_cps(self, interaction: Interaction, iterations: int = 1) -> tuple[UserProfile, StatusCode]:
         """Upgrade the cps of the user."""
+        if not interaction.guild:
+            raise AssertionError
+
         profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
         cps_cost = get_cps_cost(profile.cps)
         reloop = False
@@ -225,6 +246,10 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def enable(self, interaction: Interaction) -> None:
         """Enable the game on the current channel."""
+        if not interaction.guild or not interaction.channel:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         if interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
             await interaction.response.send_message("The game is already enabled on this channel", ephemeral=True)
         else:
@@ -234,6 +259,10 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def disable(self, interaction: Interaction) -> None:
         """Disable the game on the current channel."""
+        if not interaction.guild or not interaction.channel:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         if interaction.channel.id not in await interaction.client.database.get_channels(interaction.guild.id):
             await interaction.response.send_message("The game is already disabled on this channel")
         else:
@@ -243,6 +272,10 @@ class Config(app_commands.Group):
     @app_commands.command()
     async def reset(self, interaction: Interaction) -> None:
         """Reset access to the game for all channels."""
+        if not interaction.guild:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
         for channel_id in await interaction.client.database.get_channels(interaction.guild.id):
             await interaction.client.database.disable_channel(interaction.guild.id, channel_id)
         await interaction.response.send_message("Resetted all channels access")
@@ -251,11 +284,22 @@ class Config(app_commands.Group):
 @app_commands.describe(message="The message to send")
 async def send(interaction: Interaction, message: str) -> None:
     """Send a message to the current channel."""
+    if not interaction.guild:
+        await interaction.response.send_message("This needs to be used in a guild")
+        return
+
+    if not isinstance(interaction.channel, discord.abc.Messageable):
+        await interaction.response.send_message("This isn't possible")
+        return
+
     if interaction.channel.id not in await interaction.client.database.get_channels(interaction.guild.id):
         await interaction.response.send_message("Game is not enabled in this channel!")
         return
 
     async def cps(user_id: int) -> float:
+        if not interaction.guild:
+            raise AssertionError
+
         profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
         return profile.cps
 
@@ -268,25 +312,35 @@ async def send(interaction: Interaction, message: str) -> None:
 
 async def upgrade(interaction: Interaction) -> None:
     """Upgrade."""
+    if not interaction.guild:
+        await interaction.response.send_message("This needs to be used in a guild")
+        return
+
     view = UpgradeView()
     await interaction.response.send_message(embed=await view.create_embed(interaction), view=view, ephemeral=True)
 
 
 @app_commands.describe(user="The user to check the stats of. Defaults to you")
-async def profile(interaction: Interaction, user: discord.Member = None) -> None:
+async def profile(interaction: Interaction, user: discord.User | None = None) -> None:
     """Send a user their profile's stats."""
-    user = user or interaction.user
+    if not interaction.guild or not interaction.channel:
+        await interaction.response.send_message("This needs to be used in a guild")
+        return
 
-    if user.bot and interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
+    person = user or interaction.user
+
+    if person.bot and interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):
         await interaction.response.send_message("Bots cannot play the game :(", ephemeral=True)
         return
-    if user.bot:
+    if person.bot:
         await interaction.response.send_message("Bots cannot play the game :(")
         return
 
-    profile = await interaction.client.database.get_profile(interaction.guild.id, user.id)
+    profile = await interaction.client.database.get_profile(interaction.guild.id, person.id)
 
-    embed = discord.Embed(title=f"{user.display_name}'{"s" if user.display_name[-1].lower() != "s" else ""} Profile")
+    embed = discord.Embed(
+        title=f"{person.display_name}'{"s" if person.display_name[-1].lower() != "s" else ""} Profile"
+    )
     embed.add_field(name="Coins", value=profile.coins)
     embed.add_field(name="CPS", value=profile.cps)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())
@@ -315,8 +369,3 @@ async def main() -> None:
 
         async with client:
             await client.start(TOKEN)
-
-
-if __name__ == "__main__":
-    with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(main())

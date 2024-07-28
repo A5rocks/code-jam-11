@@ -8,7 +8,7 @@
 
 ### Locally
 
-In a virtual environment, run `python -m pip install -r requirements.txt`. Then, move `.env.example` to `.env` and fill it out. Finally, run `python app`.
+In a virtual environment, run `python -m pip install -r requirements.txt`. Then, move `.env.example` to `.env` and fill it out. Finally, run `python app.py`.
 
 ## development tool rundown
 
