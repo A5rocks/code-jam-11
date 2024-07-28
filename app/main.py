@@ -39,7 +39,7 @@ def get_cps_cost(cur_cps: float) -> int:
     if cur_cps == MAXIMUM_CPS:
         return -1
     cost = cur_cps * (math.pow(1.5, cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
-    return round(cost)
+    return math.ceil(cost)
 
 
 Interaction: typing.TypeAlias = "discord.Interaction[DiscordClient]"
@@ -296,6 +296,8 @@ async def send(interaction: Interaction, message: str) -> None:
         await interaction.response.send_message("Game is not enabled in this channel!")
         return
 
+    await interaction.client.database.add_profile(interaction.guild.id, interaction.user.id, UserProfile())
+
     async def cps(user_id: int) -> float:
         if not interaction.guild:
             raise AssertionError
@@ -303,7 +305,18 @@ async def send(interaction: Interaction, message: str) -> None:
         profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
         return profile.cps
 
-    if await send_implementation(interaction.channel.id, interaction.user.id, message, interaction.channel.send, cps):
+    async def add_coin(user_id: int) -> None:
+        if not interaction.guild:
+            raise AssertionError
+
+        profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
+        await interaction.client.database.update_profile(
+            interaction.guild.id, user_id, UserProfile(priority=profile.priority, coins=profile.coins + 1)
+        )
+
+    if await send_implementation(
+        interaction.channel.id, interaction.user.id, message, interaction.channel.send, cps, add_coin
+    ):
         await interaction.response.send_message("That is too much text to send at once.", ephemeral=True)
         return
 

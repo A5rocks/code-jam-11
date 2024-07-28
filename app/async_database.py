@@ -111,13 +111,11 @@ class AsyncDatabase(AbstractDatabase):
         user_id (int): The user whose profile will be updated
         new_profile (UserProfile): The new profile with updated values that is to be inserted.
 
-        If this is not passed in a value of None is used and the profile is not changed
-
         """
         await self.connection.execute(
             """UPDATE Users
                             SET cps = ?, coins = ?
-                            WHERE user_id = ? AND guild_id= ?""",
+                            WHERE user_id = ? AND guild_id = ?""",
             (int(new_profile.cps * 10), new_profile.coins, user_id, guild_id),
         )
         await self.connection.commit()

@@ -29,7 +29,12 @@ class Sender:
     _started: bool = dataclasses.field(init=False, default=False)
     _buffers: dict[int, str] = dataclasses.field(init=False, default_factory=dict)
 
-    async def start(self, send: Callable[[str], Awaitable[Editable]], cps: Callable[[int], Awaitable[float]]) -> None:
+    async def start(
+        self,
+        send: Callable[[str], Awaitable[Editable]],
+        cps: Callable[[int], Awaitable[float]],
+        add_coin: Callable[[int], Awaitable[None]],
+    ) -> None:
         """Task to send out messages slowly.
 
         It is ok to start this task multiple times, though not across multiple threads.
@@ -70,6 +75,7 @@ class Sender:
                     last = await send(buffer)
 
             new_cps = await cps(who)
+            await add_coin(who)
             if len(self._buffers[who]) > 1:
                 heapq.heappush(self._queue, (when + 1 / new_cps, who))
                 self._buffers[who] = self._buffers[who][1:]
@@ -95,16 +101,17 @@ class Sender:
 senders: dict[int, Sender] = collections.defaultdict(Sender)
 
 
-async def send(
+async def send(  # noqa: PLR0913; the alternative is worse
     channel_id: int,
     who: int,
     what: str,
     send: Callable[[str], Awaitable[Editable]],
     cps: Callable[[int], Awaitable[float]],
+    add_coin: Callable[[int], Awaitable[None]],
 ) -> bool:
     """Add a message to a queue of messages to be sent, potentially starting a new queue."""
     if senders[channel_id].add_item(who, await cps(who), f"{what}\n") is True:
         return True
 
-    asyncio.create_task(senders[channel_id].start(send, cps))  # noqa: RUF006
+    asyncio.create_task(senders[channel_id].start(send, cps, add_coin))  # noqa: RUF006
     return False

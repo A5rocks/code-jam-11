@@ -28,4 +28,5 @@ EXPOSE 8080
 STOPSIGNAL SIGINT
 
 COPY ./app ./app
+COPY ./app.py ./app.py
 CMD ["python", "app.py"]
