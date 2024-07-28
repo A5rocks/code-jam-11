@@ -52,25 +52,6 @@ class AsyncDatabase(AbstractDatabase):
         ):
             return [row[0] async for row in cursor]
 
-    async def add_profile(self, guild_id: int, user_id: int, user_profile: UserProfile) -> None:
-        """Add a profile to a specific guild.
-
-        Arguments:
-        ---------
-        guild_id (int): The guild that the user is in
-        user_id (int): This user whose profile is to be added
-        user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
-
-        """
-        if user_profile is None:
-            user_profile = UserProfile()
-
-        await self.connection.execute(
-            "INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?,?,?,?)",
-            (user_id, guild_id, int(user_profile.cps * 10), user_profile.coins),
-        )
-        await self.connection.commit()
-
     async def remove_profile(self, guild_id: int, user_id: int) -> None:
         """Remove a profile from a specific guild.
 
@@ -113,10 +94,10 @@ class AsyncDatabase(AbstractDatabase):
 
         """
         await self.connection.execute(
-            """UPDATE Users
-                            SET cps = ?, coins = ?
-                            WHERE user_id = ? AND guild_id = ?""",
-            (int(new_profile.cps * 10), new_profile.coins, user_id, guild_id),
+            """INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?1, ?2, ?3, ?4)
+                    ON CONFLICT(user_id, guild_id) DO UPDATE
+                            SET cps = ?3, coins = ?4""",
+            (user_id, guild_id, int(new_profile.cps * 10), new_profile.coins),
         )
         await self.connection.commit()
 
@@ -134,13 +115,15 @@ async def open_database(path: str) -> typing.AsyncIterator[AsyncDatabase]:
         # initialize tables if needed
         await db.execute("""CREATE TABLE IF NOT EXISTS Guilds (
                             id int,
-                            channel int) STRICT""")
+                            channel int,
+                            PRIMARY KEY (id, channel)) STRICT""")
         await db.commit()
         await db.execute("""CREATE TABLE IF NOT EXISTS Users (
                             user_id int,
                             guild_id int,
                             cps int,
-                            coins int) STRICT""")
+                            coins int,
+                            PRIMARY KEY (user_id, guild_id)) STRICT""")
         await db.commit()
 
         yield AsyncDatabase(db)

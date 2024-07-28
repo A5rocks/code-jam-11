@@ -57,18 +57,6 @@ class AbstractDatabase(ABC):
         """
 
     @abstractmethod
-    async def add_profile(self, guild_id: int, user_id: int, user_profile: UserProfile) -> None:
-        """Add a profile to a specific guild.
-
-        Arguments:
-        ---------
-        guild_id (int): The guild that the user is in
-        user_id (int): This user whose profile is to be added
-        user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
-
-        """
-
-    @abstractmethod
     async def remove_profile(self, guild_id: int, user_id: int) -> None:
         """Remove a profile from a specific guild.
 
@@ -145,21 +133,6 @@ class Database(AbstractDatabase):
 
         """
         return self.enabled[guild_id]
-
-    async def add_profile(self, guild_id: int, user_id: int, user_profile: UserProfile) -> None:
-        """Add a profile to a specific guild.
-
-        Arguments:
-        ---------
-        guild_id (int): The guild that the user is in
-        user_id (int): This user whose profile is to be added
-        user_profile (UserProfile | None): The UserProfile to be added, if None, a new instance is created
-
-        """
-        if user_profile is None:
-            user_profile = UserProfile()
-
-        self.activeProfiles[guild_id][user_id] = user_profile
 
     async def remove_profile(self, guild_id: int, user_id: int) -> None:
         """Remove a profile from a specific guild.
