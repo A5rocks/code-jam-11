@@ -137,7 +137,7 @@ class UpgradeView(View):
             return (profile, StatusCode.MAXIMUM_REACHED)
         new_coins = profile.coins - priority_cost
         new_priority = PRIORITY_PIPELINE[PRIORITY_PIPELINE.index(profile.priority) + 1]
-        new_profile = UserProfile(coins=new_coins, priority=new_priority)
+        new_profile = UserProfile(coins=new_coins, priority=new_priority, cps=profile.cps)
         return (new_profile, StatusCode.SUCCESS)
 
     async def _upgrade_cps(self, interaction: Interaction, iterations: int = 1) -> tuple[UserProfile, StatusCode]:

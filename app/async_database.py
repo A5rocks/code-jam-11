@@ -3,7 +3,7 @@ import typing
 
 import aiosqlite
 
-from .database import AbstractDatabase, UserProfile
+from .database import AbstractDatabase, MessagePriority, UserProfile
 
 
 class AsyncDatabase(AbstractDatabase):
@@ -75,11 +75,11 @@ class AsyncDatabase(AbstractDatabase):
         """
         async with (
             self.connection.execute(
-                "SELECT coins, cps FROM Users WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)
+                "SELECT coins, cps, priority FROM Users WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)
             ) as cursor,
         ):
             async for row in cursor:
-                return UserProfile(coins=row[0], cps=row[1])
+                return UserProfile(coins=row[0], cps=row[1], priority=MessagePriority(row[2]))
 
         return UserProfile()
 
@@ -94,10 +94,10 @@ class AsyncDatabase(AbstractDatabase):
 
         """
         await self.connection.execute(
-            """INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?1, ?2, ?3, ?4)
+            """INSERT INTO Users(user_id, guild_id, cps, coins, priority) VALUES (?1, ?2, ?3, ?4, ?5)
                     ON CONFLICT(user_id, guild_id) DO UPDATE
-                            SET cps = ?3, coins = ?4""",
-            (user_id, guild_id, new_profile.cps, new_profile.coins),
+                            SET cps = ?3, coins = ?4, priority = ?5""",
+            (user_id, guild_id, new_profile.cps, new_profile.coins, str(new_profile.priority)),
         )
         await self.connection.commit()
 
@@ -121,8 +121,9 @@ async def open_database(path: str) -> typing.AsyncIterator[AsyncDatabase]:
         await db.execute("""CREATE TABLE IF NOT EXISTS Users (
                             user_id int,
                             guild_id int,
-                            cps int,
-                            coins int,
+                            cps int NOT NULL,
+                            coins int NOT NULL,
+                            priority text NOT NULL,
                             PRIMARY KEY (user_id, guild_id)) STRICT""")
         await db.commit()
 
