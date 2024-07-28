@@ -46,11 +46,41 @@ def get_cps_cost(cur_cps: float) -> int:
 Interaction: typing.TypeAlias = "discord.Interaction[DiscordClient]"
 
 
+async def disabled_buttons(interaction: Interaction) -> set[str]:
+    """Get all upgrade buttons that are impossible due to cost."""
+    if not interaction.guild:
+        raise AssertionError
+
+    profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
+    result = set()
+
+    if profile.coins < get_cps_cost(profile.cps):
+        result.add("Upgrade CPS")
+        result.add("Upgrade CPS 10x")
+    else:
+        cost = 0
+        for cps in range(profile.cps, profile.cps + 10):
+            cost += get_cps_cost(cps)
+
+        if profile.coins < cost:
+            result.add("Upgrade CPS 10x")
+
+    if profile.coins < PRIORITY_COST[profile.priority]:
+        result.add("Upgrade Priority")
+
+    return result
+
+
 class UpgradeView(View):
     """A discord.View subclass to handle user interactions with the update screen."""
 
-    def __init__(self) -> None:
+    def __init__(self, disabled: set[str] | None = None) -> None:
         super().__init__(timeout=None)
+
+        disabled_buttons = disabled or set()
+        for item in self.children:
+            if isinstance(item, discord.ui.Button) and item.label in disabled_buttons:
+                item.disabled = True
 
     @discord.ui.button(label="Upgrade CPS", style=discord.ButtonStyle.blurple, custom_id="upgradepersistent:cps")
     async def cps_upgrade(self, interaction: Interaction, _: Button[typing.Self]) -> None:
@@ -63,7 +93,9 @@ class UpgradeView(View):
         new_profile, status_code = await self._upgrade_cps(interaction)
         await self._handle_status_code(interaction, status_code)
         await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
-        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
+        await interaction.edit_original_response(
+            embed=await self.create_embed(interaction), view=UpgradeView(await disabled_buttons(interaction))
+        )
 
     @discord.ui.button(
         label="Upgrade Priority",
@@ -80,10 +112,12 @@ class UpgradeView(View):
         new_profile, status_code = await self._upgrade_priority(interaction)
         await self._handle_status_code(interaction, status_code)
         await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
-        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
+        await interaction.edit_original_response(
+            embed=await self.create_embed(interaction), view=UpgradeView(await disabled_buttons(interaction))
+        )
 
     @discord.ui.button(
-        label="CPS Upgrade 10x", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:cps10x"
+        label="Upgrade CPS 10x", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:cps10x"
     )
     async def cps_upgrade_ten(self, interaction: Interaction, _: Button[typing.Self]) -> None:
         """Upgrade CPS ten times."""
@@ -95,7 +129,20 @@ class UpgradeView(View):
         new_profile, status_code = await self._upgrade_cps(interaction, 10)
         await self._handle_status_code(interaction, status_code)
         await interaction.client.database.update_profile(interaction.guild.id, interaction.user.id, new_profile)
-        await interaction.edit_original_response(embed=await self.create_embed(interaction), view=self)
+        await interaction.edit_original_response(
+            embed=await self.create_embed(interaction), view=UpgradeView(await disabled_buttons(interaction))
+        )
+
+    @discord.ui.button(label="Refresh", style=discord.ButtonStyle.gray, row=1, custom_id="upgradepersistent:refresh")
+    async def refresh(self, interaction: Interaction, _: Button[typing.Self]) -> None:
+        """Refresh whether buttons should be disabled or not."""
+        if not interaction.guild:
+            await interaction.response.send_message("This needs to be used in a guild")
+            return
+
+        await interaction.response.edit_message(
+            embed=await self.create_embed(interaction), view=UpgradeView(await disabled_buttons(interaction))
+        )
 
     @staticmethod
     async def create_embed(interaction: Interaction) -> discord.Embed:
@@ -103,24 +150,32 @@ class UpgradeView(View):
         if not interaction.guild:
             raise AssertionError
 
-        profile: UserProfile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
+        profile = await interaction.client.database.get_profile(interaction.guild.id, interaction.user.id)
         priority_cost = PRIORITY_COST[profile.priority]
         cps_cost = get_cps_cost(profile.cps)
-        embed = discord.Embed(title="Upgrade menu", description="Select an upgrade to obtain")
+        embed = discord.Embed(
+            title="Upgrade menu",
+            description=(
+                f"Select an upgrade to obtain. You have {profile.coins} coins "
+                f"and {profile.cps / 10} characters per second."
+            ),
+        )
         if cps_cost != -1:
             embed.add_field(
-                name="Better CPS", value=f"Increase the amount of characters you can send per second\nCosts {cps_cost}"
+                name="Better CPS",
+                value=("Increase the amount of characters you can send per second. " f"Costs {cps_cost} coins."),
             )
         else:
             embed.add_field(
-                name="Better CPS", value="Increase the amount of characters you can send per second\nMAXED OUT"
+                name="Better CPS", value=("Increase the amount of characters you can send per second. " "MAXED OUT.")
             )
         if priority_cost != -1:
             embed.add_field(
-                name="Higher Priority", value=f"Increase the priority of your messages\nCosts {priority_cost}"
+                name="Higher Priority",
+                value=("Increase the priority of your messages. " f"Costs {priority_cost} coins."),
             )
         else:
-            embed.add_field(name="Higher Priority", value="Increase the priority of your messages\nMAXED OUT")
+            embed.add_field(name="Higher Priority", value=("Increase the priority of your messages. " "MAXED OUT."))
 
         return embed
 
@@ -183,7 +238,7 @@ class UpgradeView(View):
     async def _handle_status_code(self, interaction: Interaction, status_code: StatusCode) -> None:
         """Send an ephemeral message to the user upon completion of an upgrade, depending on status_code.
 
-        Two of the status codes are handled by _upgrade_cps
+        Two of the status codes are handled by _upgrade_cps.
         """
         if status_code == StatusCode.NOT_ENOUGH_COINS:
             await interaction.followup.send(
@@ -191,8 +246,6 @@ class UpgradeView(View):
             )
         elif status_code == StatusCode.MAXIMUM_REACHED:
             await interaction.followup.send("You already have the maximum upgrade for this category", ephemeral=True)
-        elif status_code == StatusCode.SUCCESS:
-            await interaction.followup.send("Your upgrade was successful!", ephemeral=True)
 
 
 class DiscordClient(discord.Client):
@@ -320,7 +373,7 @@ async def upgrade(interaction: Interaction) -> None:
         await interaction.response.send_message("This needs to be used in a guild")
         return
 
-    view = UpgradeView()
+    view = UpgradeView(await disabled_buttons(interaction))
     await interaction.response.send_message(embed=await view.create_embed(interaction), view=view, ephemeral=True)
 
 
