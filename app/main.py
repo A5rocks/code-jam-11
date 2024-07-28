@@ -19,7 +19,7 @@ PRIORITY_COST: dict[MessagePriority, int] = {
     MessagePriority.MIDDLE: 2500,
     MessagePriority.TOP: -1,
 }
-MAXIMUM_CPS = 2000.0
+MAXIMUM_CPS = 20000
 PRIORITY_PIPELINE: list[MessagePriority] = list(PRIORITY_COST.keys())
 
 
@@ -38,6 +38,7 @@ def get_cps_cost(cur_cps: float) -> int:
     """Get the cost to upgrade with the current cps."""
     if cur_cps == MAXIMUM_CPS:
         return -1
+    cur_cps /= 10  # we store cps as e.g `11` instead of `1.1` for precision reasons
     cost = cur_cps * (math.pow(1.5, cur_cps / 30) - cur_cps / 5 + 30 - (20 / cur_cps) * math.sin(0.7 * cur_cps)) / 10
     return math.ceil(cost)
 
@@ -149,10 +150,11 @@ class UpgradeView(View):
         reloop = False
         new_coins = profile.coins
         new_cps = profile.cps
+
         for var in range(iterations):
-            if profile.coins < cps_cost and not reloop:
+            if new_coins < cps_cost and not reloop:
                 return profile, StatusCode.NOT_ENOUGH_COINS
-            if profile.coins < cps_cost and reloop:
+            if new_coins < cps_cost and reloop:
                 await interaction.followup.send(
                     f"Upgraded {var + 1} times before running out of coins.", ephemeral=True
                 )
@@ -160,9 +162,9 @@ class UpgradeView(View):
                     UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority),
                     StatusCode.NOT_ENOUGH_COINS_BEFORE_COMPLETION,
                 )
-            if profile.cps == MAXIMUM_CPS and not reloop:
+            if new_cps == MAXIMUM_CPS and not reloop:
                 return profile, StatusCode.MAXIMUM_REACHED
-            if profile.cps == MAXIMUM_CPS and reloop:
+            if new_cps == MAXIMUM_CPS and reloop:
                 await interaction.followup.send(
                     f"Upgraded {var + 1} times before reaching maximum upgrade", ephemeral=True
                 )
@@ -171,9 +173,9 @@ class UpgradeView(View):
                     StatusCode.MAXIMUM_REACHED_BEFORE_COMPLETION,
                 )
 
-            new_coins = new_coins - cps_cost
-            new_cps = new_cps + 0.1
-            cps_cost = get_cps_cost(profile.cps)
+            new_coins -= cps_cost
+            new_cps += 1
+            cps_cost = get_cps_cost(new_cps)
             reloop = True
 
         return UserProfile(coins=new_coins, cps=new_cps, priority=profile.priority), StatusCode.SUCCESS
@@ -290,7 +292,7 @@ async def send(interaction: Interaction, message: str) -> None:
             raise AssertionError
 
         profile = await interaction.client.database.get_profile(interaction.guild.id, user_id)
-        return profile.cps
+        return profile.cps / 10
 
     async def add_coin(user_id: int) -> None:
         if not interaction.guild:
@@ -344,7 +346,7 @@ async def profile(interaction: Interaction, user: discord.User | None = None) ->
         title=f"{person.display_name}'{"s" if person.display_name[-1].lower() != "s" else ""} Profile"
     )
     embed.add_field(name="Coins", value=profile.coins)
-    embed.add_field(name="CPS", value=profile.cps)
+    embed.add_field(name="CPS", value=profile.cps / 10)
     embed.add_field(name="Message Priority", value=profile.priority.capitalize())
 
     if interaction.channel.id in await interaction.client.database.get_channels(interaction.guild.id):

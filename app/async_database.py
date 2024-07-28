@@ -79,7 +79,7 @@ class AsyncDatabase(AbstractDatabase):
             ) as cursor,
         ):
             async for row in cursor:
-                return UserProfile(coins=row[0], cps=row[1] / 10)
+                return UserProfile(coins=row[0], cps=row[1])
 
         return UserProfile()
 
@@ -97,7 +97,7 @@ class AsyncDatabase(AbstractDatabase):
             """INSERT INTO Users(user_id, guild_id, cps, coins) VALUES (?1, ?2, ?3, ?4)
                     ON CONFLICT(user_id, guild_id) DO UPDATE
                             SET cps = ?3, coins = ?4""",
-            (user_id, guild_id, int(new_profile.cps * 10), new_profile.coins),
+            (user_id, guild_id, new_profile.cps, new_profile.coins),
         )
         await self.connection.commit()
 
