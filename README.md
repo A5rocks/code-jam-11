@@ -8,8 +8,9 @@ Table of contents:
  - [installing dependencies](#installing-dependencies)
  - [running the program](#running-this)
  - [development tool rundown](#development-tool-rundown)
+ - [contributors](#contributors)
 
-In our modern world, it can feel like everything is happening all at once. Encountered with this, people seek out quieter waters, turning away from larger servers. To help those larger servers, our submission addresses this information overload by limiting how much people can send at once. Essentially, we only let one character through at a time that is dependent on who is sending the message.
+In our modern world, it can feel like everything is happening all at once. Encountered with this, people seek out quieter waters, turning away from larger servers. To help those larger servers, our submission addresses information overload by limiting how much people can send at once. Essentially, we only let one character through at a time that is dependent on who is sending the message.
 
 At the behest of many a server owner, we also provide incentives for activity. Every time someone's character gets sent, they get a coin. These coins can be used to increase how many characters they can send per second, or for vanity upgrades (priority). Any incremental game is purely coincidental.
 
@@ -111,3 +112,11 @@ It is *installed* by running `pre-commit install` and can be run manually by cal
 - `ruff-format`: Runs the Ruff formatter.
 - `pip-compile requirements.in`: locks `requirements.in` to make `requirements.txt`
 - `pip-compile requirements-dev.in`: locks `requirements-dev.in` to make `requirements-dev.txt`
+
+## contributors
+
+In alphabetical order:
+ - @A5rocks (discord username: `a5rocks`) contributed the sending implementation, the README, and many smaller fixes.
+ - @aceeedev (discord username: `_aceee`) contributed the async database implementation, the profile command, and smaller features.
+ - @Darkshadogt (discord username: `darkshadogt`) contributed many smaller features everywhere.
+ - @LuckElixir (discord username: `luckgod.`) contributed the upgrade menu, the database and its interface, and helped with the formula for CPS cost.
